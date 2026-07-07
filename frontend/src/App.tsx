@@ -1,0 +1,30 @@
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { useAuth } from './auth/AuthContext';
+import { LoginPage } from './auth/LoginPage';
+import { BrowserPage } from './browser/BrowserPage';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { username, loading } = useAuth();
+  if (loading) return <p className="status">Loading...</p>;
+  if (!username) return <Navigate to="/login" replace />;
+  return children;
+}
+
+export default function App() {
+  const { username, logout } = useAuth();
+
+  return (
+    <Routes>
+      <Route path="/login" element={username ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <BrowserPage username={username!} onLogout={logout} />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}

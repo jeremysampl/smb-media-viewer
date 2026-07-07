@@ -1,0 +1,11 @@
+# Local development media folder
+
+Drop test images and videos here when running with `LOCAL_DEV=true`.
+
+The backend exposes this folder as the `media` share (configurable via `DEV_SHARE_NAME`).
+
+Supported formats:
+- Images: jpg, png, gif, webp, heic, avif, etc.
+- Videos: mp4, mkv, mov, webm, etc.
+
+Requires ffmpeg installed for video thumbnails and transcoding.

@@ -1,0 +1,36 @@
+services:
+  backend:
+    build: ./backend
+    container_name: smb-media-viewer-backend
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      TOKEN_SECRET: ${TOKEN_SECRET:-change-me-token-secret}
+      SMB_CONF_PATH: /etc/samba/smb.conf
+      GROUP_FILE_PATH: /etc/group
+      SMB_HOST: 127.0.0.1
+      CACHE_DIR: /app/cache
+      CACHE_MAX_BYTES: ${CACHE_MAX_BYTES:-10737418240}
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:8080}
+    volumes:
+      - smb_media_cache:/app/cache
+      - /etc/samba/smb.conf:/etc/samba/smb.conf:ro
+      - /etc/group:/etc/group:ro
+      # Mount each RAID share root read-only. Adjust paths for your OMV setup.
+      - /srv:/srv:ro
+
+  frontend:
+    build: ./frontend
+    container_name: smb-media-viewer-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - backend
+
+volumes:
+  smb_media_cache:
