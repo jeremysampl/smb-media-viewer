@@ -1,4 +1,4 @@
-import type { BrowseResponse, QualityProfile } from '../types';
+import type { BrowseResponse, MediaMetadata, QualityProfile } from '../types';
 
 const API_BASE = '/api';
 
@@ -40,9 +40,9 @@ export async function getShares(): Promise<BrowseResponse> {
   return request('/shares');
 }
 
-export async function browse(path: string): Promise<BrowseResponse> {
+export async function browse(path: string, signal?: AbortSignal): Promise<BrowseResponse> {
   const query = path ? `?path=${encodeURIComponent(path)}` : '';
-  return request(`/browse${query}`);
+  return request(`/browse${query}`, { signal });
 }
 
 export async function getQualityProfiles(): Promise<{ profiles: QualityProfile[] }> {
@@ -57,4 +57,8 @@ export function mediaUrl(
   const base = `${API_BASE}/media/${token}/${kind}`;
   if (kind === 'poster') return base;
   return `${base}?quality=${quality ?? 'medium'}`;
+}
+
+export async function getMediaMetadata(token: string): Promise<MediaMetadata> {
+  return request(`/media/${token}/metadata`);
 }

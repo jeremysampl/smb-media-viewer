@@ -32,6 +32,12 @@ export function getExtension(filename: string): string {
   return filename.slice(index).toLowerCase();
 }
 
+export function getFormatLabel(filename: string): string | undefined {
+  const extension = getExtension(filename);
+  if (!extension) return undefined;
+  return extension.slice(1).toUpperCase();
+}
+
 export function isImageFile(filename: string): boolean {
   return IMAGE_EXTENSIONS.has(getExtension(filename));
 }

@@ -8,7 +8,9 @@ import {
 } from '../permissions/resolver.js';
 import { authMiddleware, type AuthenticatedRequest } from '../auth/middleware.js';
 import { createMediaToken } from '../media/tokens.js';
-import { isImageFile, isMediaFile, isVideoFile } from '../media/fileTypes.js';
+import { getImageCaptureTime } from '../media/captureTime.js';
+import { getFormatLabel, isImageFile, isMediaFile, isVideoFile } from '../media/fileTypes.js';
+import { getVideoBrowseInfo } from '../media/videoMetadata.js';
 import type { BrowseEntry } from '../types.js';
 
 const router = Router();
@@ -71,6 +73,20 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
     const token = createMediaToken(absoluteEntryPath, username);
     const isVideo = isVideoFile(entry.name);
     const isImage = isImageFile(entry.name);
+    const format = getFormatLabel(entry.name);
+    let duration: number | undefined;
+    let captureTime: string | undefined;
+
+    if (isVideo) {
+      const videoInfo = await getVideoBrowseInfo(absoluteEntryPath).catch(() => ({
+        duration: undefined,
+        captureTime: undefined,
+      }));
+      duration = videoInfo.duration;
+      captureTime = videoInfo.captureTime;
+    } else if (isImage) {
+      captureTime = await getImageCaptureTime(absoluteEntryPath).catch(() => undefined);
+    }
 
     entries.push({
       name: entry.name,
@@ -78,6 +94,9 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
       type: isVideo ? 'video' : 'image',
       size: stats.size,
       mtime: stats.mtime.toISOString(),
+      captureTime,
+      format,
+      duration,
       token,
       thumbnailUrl: isImage
         ? `/api/media/${token}/image?quality=very_low`

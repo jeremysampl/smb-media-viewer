@@ -7,7 +7,9 @@ import { isQualityTier } from '../media/quality.js';
 import { getVideoPoster } from '../media/poster.js';
 import { verifyMediaToken } from '../media/tokens.js';
 import { getTranscodedVideo } from '../media/video.js';
+import { getMediaMetadata } from '../media/metadata.js';
 import { resolveShareForPath } from '../permissions/resolver.js';
+import { isMediaFile } from '../media/fileTypes.js';
 
 const router = Router();
 
@@ -92,6 +94,27 @@ router.get('/:token/poster', async (req: AuthenticatedRequest, res) => {
   } catch (error) {
     console.error('Poster generation failed:', error);
     res.status(500).json({ error: 'Failed to generate poster' });
+  }
+});
+
+router.get('/:token/metadata', async (req: AuthenticatedRequest, res) => {
+  const sourcePath = await authorizeMedia(req, getTokenParam(req.params.token));
+  if (!sourcePath) {
+    res.status(404).json({ error: 'Media not found' });
+    return;
+  }
+
+  if (!isMediaFile(sourcePath)) {
+    res.status(400).json({ error: 'Metadata is only available for images and videos' });
+    return;
+  }
+
+  try {
+    const metadata = await getMediaMetadata(sourcePath);
+    res.json(metadata);
+  } catch (error) {
+    console.error('Metadata extraction failed:', error);
+    res.status(500).json({ error: 'Failed to read image metadata' });
   }
 });
 

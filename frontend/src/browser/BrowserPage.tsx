@@ -1,21 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { browse, mediaUrl } from '../api/client';
 import type { BrowseEntry } from '../types';
 import { Breadcrumbs } from './Breadcrumbs';
 import { MediaGallery } from '../gallery/MediaGallery';
+import { LazyThumbnail } from './LazyThumbnail';
 import { ResolutionSelector, useQualityPreference } from './ResolutionSelector';
-
-function formatSize(bytes?: number): string {
-  if (!bytes) return '';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-}
+import { SortSelector, useSortPreference } from './SortSelector';
+import { GridDetailsToggle, useGridDetailsPreference } from './GridDetailsToggle';
+import { formatDuration, formatEntryMeta } from './formatters';
+import { sortEntries } from './sortEntries';
 
 interface BrowserPageProps {
   onLogout: () => Promise<void>;
@@ -30,15 +23,40 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const { quality, setQuality, profiles } = useQualityPreference();
+  const { sort, setSort } = useSortPreference();
+  const { showGridDetails, setShowGridDetails } = useGridDetailsPreference();
 
   useEffect(() => {
+    const controller = new AbortController();
+
     setLoading(true);
     setError('');
-    browse(currentPath)
-      .then((result) => setEntries(result.entries))
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load folder'))
-      .finally(() => setLoading(false));
+
+    browse(currentPath, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setEntries(result.entries);
+        }
+      })
+      .catch((err) => {
+        if (controller.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) {
+          return;
+        }
+        setError(err instanceof Error ? err.message : 'Failed to load folder');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
   }, [currentPath]);
+
+  const sortedEntries = useMemo(
+    () => sortEntries(entries, sort),
+    [entries, sort],
+  );
 
   function openEntry(entry: BrowseEntry) {
     if (entry.type === 'folder') {
@@ -46,7 +64,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
       return;
     }
 
-    const mediaEntries = entries.filter(
+    const mediaEntries = sortedEntries.filter(
       (item) => item.type === 'image' || item.type === 'video',
     );
     const index = mediaEntries.findIndex((item) => item.path === entry.path);
@@ -62,6 +80,11 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
           <p className="subtitle">Signed in as {username}</p>
         </div>
         <div className="top-actions">
+          <SortSelector sort={sort} onChange={setSort} />
+          <GridDetailsToggle
+            enabled={showGridDetails}
+            onChange={setShowGridDetails}
+          />
           <ResolutionSelector
             quality={quality}
             profiles={profiles}
@@ -80,11 +103,15 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
 
       {!loading && !error ? (
         <div className="file-grid">
-          {entries.map((entry) => (
+          {sortedEntries.map((entry) => {
+            const isMedia = entry.type === 'image' || entry.type === 'video';
+            const showMeta = !isMedia || showGridDetails;
+
+            return (
             <button
               key={entry.path}
               type="button"
-              className={`file-card ${entry.type}`}
+              className={`file-card ${entry.type}${isMedia && !showGridDetails ? ' compact' : ''}`}
               onClick={() => openEntry(entry)}
             >
               <div className="thumb-wrap">
@@ -93,33 +120,38 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
                     📁
                   </div>
                 ) : entry.token && entry.type === 'image' ? (
-                  <img
+                  <LazyThumbnail
                     src={mediaUrl(entry.token, 'image', quality)}
                     alt={entry.name}
-                    loading="lazy"
                   />
                 ) : entry.token && entry.type === 'video' ? (
-                  <img
+                  <LazyThumbnail
                     src={mediaUrl(entry.token, 'poster')}
                     alt={entry.name}
-                    loading="lazy"
                   />
                 ) : (
                   <div className="placeholder" />
                 )}
-                {entry.type === 'video' ? <span className="badge">Video</span> : null}
+                {entry.type === 'video' && entry.duration ? (
+                  <span className="badge">{formatDuration(entry.duration)}</span>
+                ) : null}
               </div>
-              <div className="meta">
-                <span className="name">{entry.name}</span>
-                {entry.size ? <span className="size">{formatSize(entry.size)}</span> : null}
-              </div>
+              {showMeta ? (
+                <div className="meta">
+                  <span className="name">{entry.name}</span>
+                  {isMedia && showGridDetails && (entry.size || entry.format) ? (
+                    <span className="size">{formatEntryMeta(entry)}</span>
+                  ) : null}
+                </div>
+              ) : null}
             </button>
-          ))}
+            );
+          })}
         </div>
       ) : null}
 
       <MediaGallery
-        entries={entries}
+        entries={sortedEntries}
         initialIndex={galleryIndex}
         open={galleryOpen}
         onClose={() => setGalleryOpen(false)}

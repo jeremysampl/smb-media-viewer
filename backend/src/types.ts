@@ -24,6 +24,9 @@ export interface BrowseEntry {
   type: 'folder' | MediaType;
   size?: number;
   mtime?: string;
+  captureTime?: string;
+  format?: string;
+  duration?: number;
   token?: string;
   thumbnailUrl?: string;
 }
