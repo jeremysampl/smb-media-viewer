@@ -206,7 +206,6 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.35rem;
   margin-bottom: 1.25rem;
   color: #9aa8bd;
 }
@@ -216,6 +215,10 @@ button:disabled {
   border: none;
   color: #8eb5ff;
   padding: 0;
+}
+
+.breadcrumbs .separator {
+  margin: 0;
 }
 
 .breadcrumbs .current {
@@ -228,6 +231,75 @@ button:disabled {
   gap: 1rem;
 }
 
+@property --cols {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 3;
+}
+
+@property --gap {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 8px;
+}
+
+@property --card-padding {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0.75rem;
+}
+
+.file-grid-mobile {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: var(--gap, 8px);
+  touch-action: pan-y;
+  transition:
+    --cols 380ms cubic-bezier(0.33, 1, 0.68, 1),
+    --gap 380ms cubic-bezier(0.33, 1, 0.68, 1),
+    --card-padding 380ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.file-grid-mobile.is-pinching {
+  transition: none;
+}
+
+.file-grid-mobile .file-card {
+  flex: 0 0 calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols));
+  width: calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols));
+  max-width: calc((100% - (var(--cols) - 1) * var(--gap)) / var(--cols));
+  box-sizing: border-box;
+  padding: var(--card-padding, 0.75rem);
+  min-width: 0;
+  transition:
+    border-radius 380ms cubic-bezier(0.33, 1, 0.68, 1),
+    gap 380ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.file-grid-mobile.is-pinching .file-card {
+  transition: none;
+}
+
+.file-grid-mobile .file-card:hover {
+  transform: none;
+}
+
+.file-grid-mobile .file-card.compact {
+  padding: calc(var(--card-padding, 0.75rem) * 0.25);
+}
+
+.file-grid-mobile .thumb-wrap {
+  border-radius: clamp(6px, calc(14px - var(--cols) * 1px), 12px);
+}
+
+.file-grid-mobile .meta .name {
+  font-size: clamp(0.7rem, calc(1.05rem - var(--cols) * 0.06rem), 0.95rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .file-card {
   display: grid;
   gap: 0.65rem;
@@ -235,6 +307,10 @@ button:disabled {
   text-align: left;
   background: rgba(20, 28, 40, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 .file-card:hover {
@@ -621,9 +697,5 @@ button:disabled {
 
   .top-bar {
     flex-direction: column;
-  }
-
-  .file-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
 }

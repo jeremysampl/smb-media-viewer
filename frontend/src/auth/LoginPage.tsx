@@ -1,10 +1,11 @@
 import { type FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -16,7 +17,10 @@ export function LoginPage() {
     setError('');
     try {
       await login(username, password);
-      navigate('/');
+      const from = (location.state as { from?: { pathname?: string } } | null)?.from;
+      const destination =
+        from?.pathname && from.pathname !== '/login' ? from.pathname : '/';
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

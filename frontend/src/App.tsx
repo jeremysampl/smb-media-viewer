@@ -1,12 +1,16 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { LoginPage } from './auth/LoginPage';
 import { BrowserPage } from './browser/BrowserPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { username, loading } = useAuth();
+  const location = useLocation();
+
   if (loading) return <p className="status">Loading...</p>;
-  if (!username) return <Navigate to="/login" replace />;
+  if (!username) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
   return children;
 }
 
@@ -15,16 +19,18 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={username ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route
-        path="/"
+        path="/login"
+        element={username ? <Navigate to="/" replace /> : <LoginPage />}
+      />
+      <Route
+        path="/*"
         element={
           <ProtectedRoute>
             <BrowserPage username={username!} onLogout={logout} />
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

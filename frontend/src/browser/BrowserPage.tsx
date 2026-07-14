@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { browse, mediaUrl } from '../api/client';
 import type { BrowseEntry } from '../types';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { Breadcrumbs } from './Breadcrumbs';
+import { browsePathToUrl, urlSplatToBrowsePath } from './browsePath';
 import { MediaGallery } from '../gallery/MediaGallery';
 import { LazyThumbnail } from './LazyThumbnail';
 import { ResolutionSelector, useQualityPreference } from './ResolutionSelector';
@@ -9,6 +12,11 @@ import { SortSelector, useSortPreference } from './SortSelector';
 import { GridDetailsToggle, useGridDetailsPreference } from './GridDetailsToggle';
 import { formatDuration, formatEntryMeta } from './formatters';
 import { sortEntries } from './sortEntries';
+import {
+  gapForColumns,
+  paddingForColumns,
+  useMobileGridColumns,
+} from './useMobileGridColumns';
 
 interface BrowserPageProps {
   onLogout: () => Promise<void>;
@@ -16,7 +24,11 @@ interface BrowserPageProps {
 }
 
 export function BrowserPage({ onLogout, username }: BrowserPageProps) {
-  const [currentPath, setCurrentPath] = useState('');
+  const navigate = useNavigate();
+  const params = useParams();
+  const currentPath = urlSplatToBrowsePath(params['*']);
+  const isMobile = useIsMobile();
+  const { gridRef, columns, isPinching, shouldSuppressClick } = useMobileGridColumns(isMobile);
   const [entries, setEntries] = useState<BrowseEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,6 +37,10 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   const { quality, setQuality, profiles } = useQualityPreference();
   const { sort, setSort } = useSortPreference();
   const { showGridDetails, setShowGridDetails } = useGridDetailsPreference();
+
+  function navigateToPath(path: string) {
+    navigate(browsePathToUrl(path));
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -59,8 +75,10 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   );
 
   function openEntry(entry: BrowseEntry) {
+    if (shouldSuppressClick()) return;
+
     if (entry.type === 'folder') {
-      setCurrentPath(entry.path);
+      navigateToPath(entry.path);
       return;
     }
 
@@ -71,6 +89,16 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
     setGalleryIndex(index >= 0 ? index : 0);
     setGalleryOpen(true);
   }
+
+  const gridStyle = isMobile
+    ? ({
+        '--cols': columns,
+        '--gap': `${gapForColumns(columns)}px`,
+        '--card-padding': `${paddingForColumns(columns)}rem`,
+      } as React.CSSProperties)
+    : undefined;
+
+  const denseGrid = isMobile && columns >= 4;
 
   return (
     <div className="browser-page">
@@ -96,56 +124,64 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
         </div>
       </header>
 
-      <Breadcrumbs path={currentPath} onNavigate={setCurrentPath} />
+      <Breadcrumbs path={currentPath} onNavigate={navigateToPath} />
 
       {loading ? <p className="status">Loading...</p> : null}
       {error ? <p className="error">{error}</p> : null}
 
       {!loading && !error ? (
-        <div className="file-grid">
+        <div
+          ref={gridRef}
+          className={`file-grid${isMobile ? ' file-grid-mobile' : ''}${
+            isPinching ? ' is-pinching' : ''
+          }`}
+          style={gridStyle}
+        >
           {sortedEntries.map((entry) => {
             const isMedia = entry.type === 'image' || entry.type === 'video';
-            const showMeta = !isMedia || showGridDetails;
+            const showMeta = (!isMedia || showGridDetails) && !denseGrid;
 
             return (
-            <button
-              key={entry.path}
-              type="button"
-              className={`file-card ${entry.type}${isMedia && !showGridDetails ? ' compact' : ''}`}
-              data-media-path={isMedia ? entry.path : undefined}
-              onClick={() => openEntry(entry)}
-            >
-              <div className="thumb-wrap">
-                {entry.type === 'folder' ? (
-                  <div className="folder-icon" aria-hidden>
-                    📁
-                  </div>
-                ) : entry.token && entry.type === 'image' ? (
-                  <LazyThumbnail
-                    src={mediaUrl(entry.token, 'image', quality)}
-                    alt={entry.name}
-                  />
-                ) : entry.token && entry.type === 'video' ? (
-                  <LazyThumbnail
-                    src={mediaUrl(entry.token, 'poster')}
-                    alt={entry.name}
-                  />
-                ) : (
-                  <div className="placeholder" />
-                )}
-                {entry.type === 'video' && entry.duration ? (
-                  <span className="badge">{formatDuration(entry.duration)}</span>
-                ) : null}
-              </div>
-              {showMeta ? (
-                <div className="meta">
-                  <span className="name">{entry.name}</span>
-                  {isMedia && showGridDetails && (entry.size || entry.format) ? (
-                    <span className="size">{formatEntryMeta(entry)}</span>
+              <button
+                key={entry.path}
+                type="button"
+                className={`file-card ${entry.type}${
+                  isMedia && (!showGridDetails || denseGrid) ? ' compact' : ''
+                }`}
+                data-media-path={isMedia ? entry.path : undefined}
+                onClick={() => openEntry(entry)}
+              >
+                <div className="thumb-wrap">
+                  {entry.type === 'folder' ? (
+                    <div className="folder-icon" aria-hidden>
+                      📁
+                    </div>
+                  ) : entry.token && entry.type === 'image' ? (
+                    <LazyThumbnail
+                      src={mediaUrl(entry.token, 'image', quality)}
+                      alt={entry.name}
+                    />
+                  ) : entry.token && entry.type === 'video' ? (
+                    <LazyThumbnail
+                      src={mediaUrl(entry.token, 'poster')}
+                      alt={entry.name}
+                    />
+                  ) : (
+                    <div className="placeholder" />
+                  )}
+                  {entry.type === 'video' && entry.duration ? (
+                    <span className="badge">{formatDuration(entry.duration)}</span>
                   ) : null}
                 </div>
-              ) : null}
-            </button>
+                {showMeta ? (
+                  <div className="meta">
+                    <span className="name">{entry.name}</span>
+                    {isMedia && showGridDetails && (entry.size || entry.format) ? (
+                      <span className="size">{formatEntryMeta(entry)}</span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </button>
             );
           })}
         </div>
