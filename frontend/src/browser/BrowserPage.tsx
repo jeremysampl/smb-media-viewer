@@ -112,6 +112,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
               key={entry.path}
               type="button"
               className={`file-card ${entry.type}${isMedia && !showGridDetails ? ' compact' : ''}`}
+              data-media-path={isMedia ? entry.path : undefined}
               onClick={() => openEntry(entry)}
             >
               <div className="thumb-wrap">
