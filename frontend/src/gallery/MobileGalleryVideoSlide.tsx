@@ -53,15 +53,18 @@ export function MobileGalleryVideoSlide({
   if (!entry.token) return null;
 
   const showPoster = !isActive || !mediaReady;
+  const posterSrc = isActive || isNearby ? posterUrl : '';
 
   return (
     <div className="mobile-gallery-video-frame">
-      <img
-        className={`mobile-gallery-video-poster${showPoster ? '' : ' hidden'}`}
-        src={posterUrl}
-        alt={entry.name}
-        draggable={false}
-      />
+      {posterSrc ? (
+        <img
+          className={`mobile-gallery-video-poster${showPoster ? '' : ' hidden'}`}
+          src={posterSrc}
+          alt={entry.name}
+          draggable={false}
+        />
+      ) : null}
       {shouldLoadVideo ? (
         <video
           ref={videoRef}
@@ -70,7 +73,7 @@ export function MobileGalleryVideoSlide({
           controls={controlsVisible && isActive && mediaReady}
           playsInline
           muted={!isActive}
-          preload="auto"
+          preload={isActive ? 'auto' : 'metadata'}
           onLoadedData={() => setMediaReady(true)}
           onCanPlay={() => setMediaReady(true)}
         />

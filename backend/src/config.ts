@@ -28,6 +28,8 @@ export const config = {
   cacheDir: process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache'),
   cacheMaxBytes: Number(process.env.CACHE_MAX_BYTES ?? 10 * 1024 * 1024 * 1024),
   cacheCleanupCron: process.env.CACHE_CLEANUP_CRON ?? '0 */6 * * *',
+  /** Permanent SQLite metadata + tiny grid thumbs/posters (not evicted). */
+  indexDir: process.env.INDEX_DIR ?? path.join(process.cwd(), 'index'),
   tokenSecret: requireEnv('TOKEN_SECRET', 'change-me-token-secret'),
   frontendOrigin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173',
 };

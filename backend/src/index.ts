@@ -7,6 +7,7 @@ import authRoutes from './auth/routes.js';
 import browseRoutes from './routes/browse.js';
 import mediaRoutes from './routes/media.js';
 import { startCacheCleanupJob } from './cache/cleanup.js';
+import { getIndexDb } from './index/db.js';
 import { QUALITY_PROFILES } from './media/quality.js';
 
 const app = express();
@@ -37,10 +38,12 @@ app.use((error: Error, _req: express.Request, res: express.Response, _next: expr
   res.status(500).json({ error: 'Internal server error' });
 });
 
+getIndexDb();
 startCacheCleanupJob();
 
 app.listen(config.port, () => {
   console.log(`SMB Media Viewer API listening on port ${config.port}`);
+  console.log(`Media index directory: ${path.resolve(config.indexDir)}`);
   if (config.localDev) {
     console.log(`[LOCAL_DEV] Serving share "${config.devShareName}" from ${path.resolve(config.devMediaRoot)}`);
     if (config.smbHost !== 'localhost') {

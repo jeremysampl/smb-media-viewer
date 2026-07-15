@@ -21,7 +21,15 @@ Self-hosted media gallery for OpenMediaVault NAS shares. Users sign in with thei
 | Very High | 2560px | 1440p |
 | Full | Original | Original/remuxed |
 
-Transcodes and thumbnails are cached on disk. A background job evicts old cache files when the cache volume exceeds the configured size cap.
+Transcodes for the lightbox are cached on disk under `CACHE_DIR` and may be evicted when the cache exceeds `CACHE_MAX_BYTES`.
+
+A separate **permanent media index** (`INDEX_DIR`) stores:
+- SQLite metadata used for date sorting (`capture_time`) and video duration badges
+- Tiny grid thumbnails (`very_low` WebP) and video posters
+
+The index is not size-capped. Folder browse returns as soon as directory listing + SQLite lookups finish; missing files are indexed in the background. The first open of a huge folder may sort by file mtime until indexing catches up; later visits reuse the on-disk index.
+
+Configure both locations via env (`CACHE_DIR`, `INDEX_DIR`). In Docker Compose these map to `smb_media_cache` and `smb_media_index` volumes.
 
 ## Prerequisites (OMV host)
 
@@ -104,6 +112,7 @@ In local dev mode the backend:
 - Skips Samba authentication (when `SMB_HOST=localhost`)
 - Serves files directly from `DEV_MEDIA_ROOT` as a single fake share
 - Still runs the real image resize / video transcode / cache pipeline
+- Writes permanent browse metadata and grid thumbs under `INDEX_DIR` (default `./index`)
 
 #### Testing against your real NAS from your PC
 
@@ -166,6 +175,8 @@ Media tokens are signed and scoped to the authenticated user.
 - **Empty share list**: verify `smb.conf` share `path` values match mounted volumes and ACLs include the user or their group.
 - **Videos won't play**: first view triggers ffmpeg transcode; wait for cache generation or try a lower quality tier.
 - **High CPU usage**: lower default quality tier and reduce concurrent viewers; cache warms up over time.
+- **Date sort looks wrong on first open**: background indexing of that folder is still running; reopen the folder once indexing finishes (data lives under `INDEX_DIR`).
+- **Slow first thumbnail row**: grid thumbs are generated into `INDEX_DIR` on demand / while indexing; they are permanent afterward.
 
 ## License
 

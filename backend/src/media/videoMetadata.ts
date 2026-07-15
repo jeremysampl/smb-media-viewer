@@ -33,6 +33,7 @@ interface FfprobeStream {
   r_frame_rate?: string;
   channels?: number;
   sample_rate?: string;
+  tags?: Record<string, string>;
 }
 
 interface FfprobeResult {
@@ -122,7 +123,7 @@ export async function getVideoBrowseInfo(sourcePath: string): Promise<{
         '-print_format',
         'json',
         '-show_entries',
-        'format=duration:format_tags=creation_time,date,com.apple.quicktime.creationdate',
+        'format=duration:format_tags:stream_tags',
         '-of',
         'json',
         sourcePath,
@@ -139,13 +140,15 @@ export async function getVideoBrowseInfo(sourcePath: string): Promise<{
       try {
         const parsed = JSON.parse(stdout) as {
           format?: { duration?: string; tags?: Record<string, string> };
+          streams?: Array<{ tags?: Record<string, string> }>;
         };
         const duration = parsed.format?.duration
           ? Number(parsed.format.duration)
           : undefined;
+        const streamTags = (parsed.streams ?? []).map((stream) => stream.tags);
         resolve({
           duration: Number.isFinite(duration) ? duration : undefined,
-          captureTime: pickVideoCaptureTime(parsed.format?.tags),
+          captureTime: pickVideoCaptureTime(parsed.format?.tags, ...streamTags),
         });
       } catch {
         resolve({});
@@ -167,6 +170,7 @@ export async function getVideoMetadata(sourcePath: string): Promise<VideoMetadat
   const videoStream = probe.streams?.find((stream) => stream.codec_type === 'video');
   const audioStream = probe.streams?.find((stream) => stream.codec_type === 'audio');
   const tags = probe.format?.tags;
+  const streamTags = (probe.streams ?? []).map((stream) => stream.tags);
 
   const metadata: VideoMetadata = {
     kind: 'video',
@@ -183,7 +187,7 @@ export async function getVideoMetadata(sourcePath: string): Promise<VideoMetadat
     audioSampleRate: audioStream?.sample_rate
       ? Number(audioStream.sample_rate)
       : undefined,
-    captureTime: pickVideoCaptureTime(tags),
+    captureTime: pickVideoCaptureTime(tags, ...streamTags),
   };
 
   if (videoStream?.width && videoStream.height) {

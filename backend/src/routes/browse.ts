@@ -8,10 +8,13 @@ import {
 } from '../permissions/resolver.js';
 import { authMiddleware, type AuthenticatedRequest } from '../auth/middleware.js';
 import { createMediaToken } from '../media/tokens.js';
-import { getImageCaptureTime } from '../media/captureTime.js';
 import { getFormatLabel, isImageFile, isMediaFile, isVideoFile } from '../media/fileTypes.js';
-import { getVideoBrowseInfo } from '../media/videoMetadata.js';
+import { getMediaIndexRows } from '../index/db.js';
+import { enqueueIndexJobs, type IndexJob } from '../index/indexer.js';
+import { mapWithConcurrency } from '../util/concurrency.js';
 import type { BrowseEntry } from '../types.js';
+
+const STAT_CONCURRENCY = 16;
 
 const router = Router();
 
@@ -47,6 +50,11 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
   }
 
   const entries: BrowseEntry[] = [];
+  const mediaCandidates: Array<{
+    name: string;
+    entryBrowsePath: string;
+    absoluteEntryPath: string;
+  }> = [];
 
   for (const entry of dirEntries) {
     if (entry.name.startsWith('.')) continue;
@@ -67,36 +75,67 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
 
     if (!entry.isFile() || !isMediaFile(entry.name)) continue;
 
-    const stats = await fs.stat(absoluteEntryPath).catch(() => null);
-    if (!stats) continue;
+    mediaCandidates.push({
+      name: entry.name,
+      entryBrowsePath,
+      absoluteEntryPath,
+    });
+  }
 
-    const token = createMediaToken(absoluteEntryPath, username);
-    const isVideo = isVideoFile(entry.name);
-    const isImage = isImageFile(entry.name);
-    const format = getFormatLabel(entry.name);
-    let duration: number | undefined;
-    let captureTime: string | undefined;
+  const stated = await mapWithConcurrency(
+    mediaCandidates,
+    STAT_CONCURRENCY,
+    async (job) => {
+      const stats = await fs.stat(job.absoluteEntryPath).catch(() => null);
+      if (!stats) return null;
+      return { ...job, stats };
+    },
+  );
 
-    if (isVideo) {
-      const videoInfo = await getVideoBrowseInfo(absoluteEntryPath).catch(() => ({
-        duration: undefined,
-        captureTime: undefined,
-      }));
-      duration = videoInfo.duration;
-      captureTime = videoInfo.captureTime;
-    } else if (isImage) {
-      captureTime = await getImageCaptureTime(absoluteEntryPath).catch(() => undefined);
+  const mediaFiles = stated.filter(
+    (item): item is NonNullable<typeof item> => item !== null,
+  );
+
+  const indexRows = getMediaIndexRows(mediaFiles.map((item) => item.absoluteEntryPath));
+  const staleJobs: IndexJob[] = [];
+
+  for (const file of mediaFiles) {
+    const isVideo = isVideoFile(file.name);
+    const isImage = isImageFile(file.name);
+    const token = createMediaToken(file.absoluteEntryPath, username);
+    const mtimeMs = file.stats.mtimeMs;
+    const indexed = indexRows.get(file.absoluteEntryPath);
+    const fresh = indexed && indexed.mtimeMs === mtimeMs;
+
+    if (!fresh) {
+      staleJobs.push({
+        absolutePath: file.absoluteEntryPath,
+        mtimeMs,
+        size: file.stats.size,
+        kind: isVideo ? 'video' : 'image',
+      });
+    } else if (
+      !indexed.thumbKey ||
+      (isVideo && !indexed.captureTime) ||
+      (isImage && !indexed.captureTime)
+    ) {
+      staleJobs.push({
+        absolutePath: file.absoluteEntryPath,
+        mtimeMs,
+        size: file.stats.size,
+        kind: isVideo ? 'video' : 'image',
+      });
     }
 
     entries.push({
-      name: entry.name,
-      path: entryBrowsePath,
+      name: file.name,
+      path: file.entryBrowsePath,
       type: isVideo ? 'video' : 'image',
-      size: stats.size,
-      mtime: stats.mtime.toISOString(),
-      captureTime,
-      format,
-      duration,
+      size: file.stats.size,
+      mtime: file.stats.mtime.toISOString(),
+      captureTime: fresh ? indexed.captureTime ?? undefined : undefined,
+      format: getFormatLabel(file.name),
+      duration: fresh ? indexed.duration ?? undefined : undefined,
       token,
       thumbnailUrl: isImage
         ? `/api/media/${token}/image?quality=very_low`
@@ -115,6 +154,10 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
     share: resolved.share.name,
     entries,
   });
+
+  if (staleJobs.length > 0) {
+    enqueueIndexJobs(staleJobs);
+  }
 });
 
 export default router;

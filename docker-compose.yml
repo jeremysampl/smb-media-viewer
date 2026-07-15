@@ -13,9 +13,11 @@ services:
       SMB_HOST: 127.0.0.1
       CACHE_DIR: /app/cache
       CACHE_MAX_BYTES: ${CACHE_MAX_BYTES:-10737418240}
+      INDEX_DIR: /app/index
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:8080}
     volumes:
       - smb_media_cache:/app/cache
+      - smb_media_index:/app/index
       - /etc/samba/smb.conf:/etc/samba/smb.conf:ro
       - /etc/group:/etc/group:ro
       # Mount each RAID share root read-only. Adjust paths for your OMV setup.
@@ -34,3 +36,4 @@ services:
 
 volumes:
   smb_media_cache:
+  smb_media_index:

@@ -704,6 +704,7 @@ export function MobileGallery({
         >
           {mediaEntries.map((entry, slideIndex) => {
             const isActive = slideIndex === index;
+            const isNearby = Math.abs(slideIndex - index) <= 1;
             const slideStyle: React.CSSProperties = {
               width: layout.slideWidth,
             };
@@ -731,7 +732,7 @@ export function MobileGallery({
                 data-index={slideIndex}
                 style={slideStyle}
               >
-                {entry.type === 'video' && entry.token ? (
+                {!isNearby ? null : entry.type === 'video' && entry.token ? (
                   <MobileGalleryVideoSlide
                     entry={entry}
                     isActive={isActive}
@@ -746,7 +747,7 @@ export function MobileGallery({
                     alt={entry.name}
                     draggable={false}
                     style={
-                      isActive && entry.type === 'image'
+                      isActive
                         ? { transform: imageZoomTransform(imageZoom) }
                         : undefined
                     }

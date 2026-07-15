@@ -8,12 +8,24 @@ import {
   readCacheEntry,
   writeAtomic,
 } from '../cache/cache.js';
+import { ensureIndexAsset } from '../index/indexer.js';
 
 export async function getResizedImage(
   sourcePath: string,
   quality: QualityTier,
 ): Promise<{ filePath: string; contentType: string }> {
   const stats = await fs.stat(sourcePath);
+
+  if (quality === 'very_low') {
+    const indexed = await ensureIndexAsset(
+      sourcePath,
+      stats.mtimeMs,
+      stats.size,
+      'image',
+    );
+    return { filePath: indexed.filePath, contentType: indexed.contentType };
+  }
+
   const key = buildCacheKey(sourcePath, stats.mtimeMs, quality, 'image');
   const cachePath = getCachePath('images', key, '.webp');
   const cached = await readCacheEntry(cachePath);
@@ -22,20 +34,34 @@ export async function getResizedImage(
   }
 
   const profile = getQualityProfile(quality);
-  let pipeline = sharp(sourcePath).rotate();
+  const resize = profile.imageMaxDimension
+    ? {
+        width: profile.imageMaxDimension,
+        height: profile.imageMaxDimension,
+        fit: 'inside' as const,
+        withoutEnlargement: true,
+      }
+    : null;
 
-  if (profile.imageMaxDimension) {
-    pipeline = pipeline.resize({
-      width: profile.imageMaxDimension,
-      height: profile.imageMaxDimension,
-      fit: 'inside',
-      withoutEnlargement: true,
+  try {
+    let pipeline = sharp(sourcePath, {
+      failOn: 'none',
+      sequentialRead: false,
+    }).rotate();
+    if (resize) pipeline = pipeline.resize(resize);
+    const buffer = await pipeline.webp({ quality: 82 }).toBuffer();
+    await writeAtomic(cachePath, buffer);
+    return { filePath: cachePath, contentType: 'image/webp' };
+  } catch {
+    let fallback = sharp(sourcePath, {
+      failOn: 'none',
+      sequentialRead: false,
     });
+    if (resize) fallback = fallback.resize(resize);
+    const buffer = await fallback.webp({ quality: 82 }).toBuffer();
+    await writeAtomic(cachePath, buffer);
+    return { filePath: cachePath, contentType: 'image/webp' };
   }
-
-  const buffer = await pipeline.webp({ quality: 82 }).toBuffer();
-  await writeAtomic(cachePath, buffer);
-  return { filePath: cachePath, contentType: 'image/webp' };
 }
 
 export async function getThumbnailImage(

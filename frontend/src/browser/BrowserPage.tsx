@@ -74,6 +74,96 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
     [entries, sort],
   );
 
+  const needsIndexRefresh = useMemo(
+    () =>
+      entries.some(
+        (entry) =>
+          (entry.type === 'image' || entry.type === 'video') && !entry.captureTime,
+      ),
+    [entries],
+  );
+
+  // Soft-refresh while background indexing fills in captureTime / duration.
+  // Keep existing tokens so thumbnail <img> src values do not change (avoids RAM spikes).
+  useEffect(() => {
+    if (loading || error || !needsIndexRefresh) return undefined;
+
+    let cancelled = false;
+    let attempts = 0;
+    let stagnantRounds = 0;
+    const maxAttempts = 12;
+
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      if (attempts > maxAttempts) {
+        window.clearInterval(timer);
+        return;
+      }
+
+      browse(currentPath)
+        .then((result) => {
+          if (cancelled) return;
+
+          const incomingByPath = new Map(
+            result.entries.map((entry) => [entry.path, entry]),
+          );
+
+          setEntries((previous) => {
+            let filled = 0;
+            let changed = false;
+            const next = previous.map((prior) => {
+              const incoming = incomingByPath.get(prior.path);
+              if (!incoming) return prior;
+
+              const nextCapture = incoming.captureTime ?? prior.captureTime;
+              const nextDuration = incoming.duration ?? prior.duration;
+              if (
+                nextCapture === prior.captureTime &&
+                nextDuration === prior.duration
+              ) {
+                return prior;
+              }
+
+              if (!prior.captureTime && nextCapture) filled += 1;
+              changed = true;
+
+              // Capture-time arriving usually means the index thumb/poster is ready.
+              // Bust the thumbnail URL once so LazyThumbnail remounts without
+              // swapping the media token (which would reload every grid image).
+              const thumbnailUrl =
+                !prior.captureTime && nextCapture && prior.thumbnailUrl
+                  ? `${prior.thumbnailUrl}${prior.thumbnailUrl.includes('?') ? '&' : '?'}v=1`
+                  : prior.thumbnailUrl;
+
+              return {
+                ...prior,
+                captureTime: nextCapture,
+                duration: nextDuration,
+                thumbnailUrl,
+              };
+            });
+
+            if (filled === 0) {
+              stagnantRounds += 1;
+              if (stagnantRounds >= 3) {
+                window.clearInterval(timer);
+              }
+            } else {
+              stagnantRounds = 0;
+            }
+
+            return changed ? next : previous;
+          });
+        })
+        .catch(() => undefined);
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [currentPath, loading, error, needsIndexRefresh]);
+
   function openEntry(entry: BrowseEntry) {
     if (shouldSuppressClick()) return;
 
@@ -158,12 +248,12 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
                     </div>
                   ) : entry.token && entry.type === 'image' ? (
                     <LazyThumbnail
-                      src={mediaUrl(entry.token, 'image', quality)}
+                      src={entry.thumbnailUrl ?? mediaUrl(entry.token, 'image', 'very_low')}
                       alt={entry.name}
                     />
                   ) : entry.token && entry.type === 'video' ? (
                     <LazyThumbnail
-                      src={mediaUrl(entry.token, 'poster')}
+                      src={entry.thumbnailUrl ?? mediaUrl(entry.token, 'poster')}
                       alt={entry.name}
                     />
                   ) : (
