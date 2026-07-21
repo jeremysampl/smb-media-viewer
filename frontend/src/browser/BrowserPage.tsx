@@ -9,6 +9,11 @@ import { MediaGallery } from '../gallery/MediaGallery';
 import { LazyThumbnail } from './LazyThumbnail';
 import { ResolutionSelector, useQualityPreference } from './ResolutionSelector';
 import { SortSelector, useSortPreference } from './SortSelector';
+import { FileTypeSelector } from './FileTypeSelector';
+import {
+  filterEntriesByFileType,
+  useFileTypeFilterPreference,
+} from './fileTypeFilter';
 import { GridDetailsToggle, useGridDetailsPreference } from './GridDetailsToggle';
 import { DownloadDialog } from './DownloadDialog';
 import { EntryContextMenu, type ContextMenuState } from './EntryContextMenu';
@@ -47,6 +52,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const { quality, setQuality, profiles } = useQualityPreference();
   const { sort, setSort } = useSortPreference();
+  const { fileTypeFilter, setFileTypeFilter } = useFileTypeFilterPreference();
   const { showGridDetails, setShowGridDetails } = useGridDetailsPreference();
   const [indexBannerDismissed, setIndexBannerDismissed] = useState(false);
   const [indexingActive, setIndexingActive] = useState(false);
@@ -57,6 +63,8 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   const [downloadError, setDownloadError] = useState('');
   const [downloadTargets, setDownloadTargets] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [typeFilterBusy, setTypeFilterBusy] = useState(false);
+  const [sortBusy, setSortBusy] = useState(false);
 
   const longPressTimerRef = useRef<number | null>(null);
   const longPressOriginRef = useRef<{ x: number; y: number } | null>(null);
@@ -69,7 +77,14 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   }
 
   function handleSortChange(next: typeof sort) {
+    setSortBusy(true);
     setSort(next);
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  function handleFileTypeFilterChange(next: typeof fileTypeFilter) {
+    setTypeFilterBusy(true);
+    setFileTypeFilter(next);
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
@@ -161,14 +176,26 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   }, [currentPath]);
 
   const sortedEntries = useMemo(
-    () => sortEntries(entries, sort),
-    [entries, sort],
+    () => sortEntries(filterEntriesByFileType(entries, fileTypeFilter), sort),
+    [entries, fileTypeFilter, sort],
   );
 
   const gridLayoutKey = useMemo(
-    () => sortedEntries.map((entry) => entry.path).join('\n'),
-    [sortedEntries],
+    () => `${fileTypeFilter}\n${sortedEntries.map((entry) => entry.path).join('\n')}`,
+    [fileTypeFilter, sortedEntries],
   );
+
+  useEffect(() => {
+    if (!typeFilterBusy) return undefined;
+    const timer = window.setTimeout(() => setTypeFilterBusy(false), 500);
+    return () => window.clearTimeout(timer);
+  }, [typeFilterBusy, gridLayoutKey]);
+
+  useEffect(() => {
+    if (!sortBusy) return undefined;
+    const timer = window.setTimeout(() => setSortBusy(false), 500);
+    return () => window.clearTimeout(timer);
+  }, [sortBusy, gridLayoutKey]);
 
   const needsIndexRefresh = useMemo(
     () =>
@@ -385,15 +412,20 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
       <div className="browser-nav-row">
         <Breadcrumbs path={currentPath} onNavigate={navigateToPath} />
         <div className="toolbar-group" role="group" aria-label="Library controls">
-          <SortSelector sort={sort} onChange={handleSortChange} />
-          <GridDetailsToggle
-            enabled={showGridDetails}
-            onChange={setShowGridDetails}
+          <SortSelector sort={sort} onChange={handleSortChange} busy={sortBusy} />
+          <FileTypeSelector
+            value={fileTypeFilter}
+            onChange={handleFileTypeFilterChange}
+            busy={typeFilterBusy}
           />
           <ResolutionSelector
             quality={quality}
             profiles={profiles}
             onChange={setQuality}
+          />
+          <GridDetailsToggle
+            enabled={showGridDetails}
+            onChange={setShowGridDetails}
           />
         </div>
       </div>
@@ -425,6 +457,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
             isPinching ? ' is-pinching' : ''
           }`}
           style={gridStyle}
+          aria-busy={typeFilterBusy || sortBusy}
         >
           {sortedEntries.map((entry) => {
             const isMedia = entry.type === 'image' || entry.type === 'video';
@@ -469,14 +502,14 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
                     </div>
                   ) : entry.token && entry.type === 'image' ? (
                     <LazyThumbnail
-                      key={`${entry.path}:${sort}`}
+                      key={`${entry.path}:${sort}:${fileTypeFilter}`}
                       src={entry.thumbnailUrl ?? mediaUrl(entry.token, 'image', 'very_low')}
                       alt={entry.name}
                       layoutKey={gridLayoutKey}
                     />
                   ) : entry.token && entry.type === 'video' ? (
                     <LazyThumbnail
-                      key={`${entry.path}:${sort}`}
+                      key={`${entry.path}:${sort}:${fileTypeFilter}`}
                       src={entry.thumbnailUrl ?? mediaUrl(entry.token, 'poster')}
                       alt={entry.name}
                       layoutKey={gridLayoutKey}

@@ -23,17 +23,25 @@ export function useSortPreference(): {
 interface SortSelectorProps {
   sort: SortMethod;
   onChange: (sort: SortMethod) => void;
+  busy?: boolean;
 }
 
-export function SortSelector({ sort, onChange }: SortSelectorProps) {
+export function SortSelector({ sort, onChange, busy = false }: SortSelectorProps) {
   return (
-    <label className="toolbar-control">
-      <span className="toolbar-control-label">Sort</span>
+    <label className={`toolbar-control${busy ? ' is-busy' : ''}`}>
+      <span className="toolbar-control-label">
+        <span className={busy ? 'is-hidden' : undefined}>Sort</span>
+        <span
+          className={`toolbar-control-spinner${busy ? ' is-visible' : ''}`}
+          aria-hidden={!busy}
+        />
+      </span>
       <select
         className="toolbar-control-select"
         value={sort}
-        onChange={(event) => onChange(event.target.value as SortMethod)}
         aria-label="Sort"
+        aria-busy={busy}
+        onChange={(event) => onChange(event.target.value as SortMethod)}
       >
         {SORT_OPTIONS.map((option) => (
           <option key={option.id} value={option.id}>

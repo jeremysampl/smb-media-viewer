@@ -25,7 +25,7 @@ function marginFor(element: HTMLElement, bufferRows: number): number {
 export function LazyThumbnail({
   src,
   alt,
-  bufferRows = 1,
+  bufferRows = 2,
   layoutKey,
 }: LazyThumbnailProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -48,35 +48,46 @@ export function LazyThumbnail({
     const element = ref.current;
     if (!element) return undefined;
 
+    const update = () => {
+      setInView(isNearViewport(element, marginFor(element, bufferRows)));
+    };
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setInView(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          setInView(true);
+          return;
+        }
+        // Keep loaded thumbs mounted while only slightly off-screen; drop when
+        // clearly away so filter/sort reshuffles still refresh correctly.
+        update();
       },
       { rootMargin: `${marginFor(element, bufferRows)}px 0px` },
     );
     observer.observe(element);
-
-    // Initial callback can be delayed; measure immediately too.
-    setInView(isNearViewport(element, marginFor(element, bufferRows)));
+    update();
 
     return () => observer.disconnect();
   }, [bufferRows, layoutKey, src]);
 
-  // Sort/reorder: drop decoded images first, then re-measure after layout settles.
+  // After sort/filter layout changes, re-check visibility without blanking first
+  // (blanking raced the observer and left some thumbs stuck unloaded).
   useLayoutEffect(() => {
     if (layoutKey === undefined) return undefined;
 
-    setInView(false);
-    setLoaded(false);
+    const element = ref.current;
+    if (element) {
+      setInView(isNearViewport(element, marginFor(element, bufferRows)));
+    }
 
     let cancelled = false;
     let innerFrame = 0;
     const outerFrame = window.requestAnimationFrame(() => {
       innerFrame = window.requestAnimationFrame(() => {
         if (cancelled) return;
-        const element = ref.current;
-        if (!element) return;
-        setInView(isNearViewport(element, marginFor(element, bufferRows)));
+        const node = ref.current;
+        if (!node) return;
+        setInView(isNearViewport(node, marginFor(node, bufferRows)));
       });
     });
 
@@ -86,12 +97,6 @@ export function LazyThumbnail({
       window.cancelAnimationFrame(innerFrame);
     };
   }, [layoutKey, bufferRows]);
-
-  useEffect(() => {
-    if (!inView) {
-      setLoaded(false);
-    }
-  }, [inView]);
 
   useEffect(() => {
     if (!awaitingRetry || giveUp) return undefined;
@@ -105,6 +110,15 @@ export function LazyThumbnail({
   }, [awaitingRetry, giveUp]);
 
   const showImage = inView && !giveUp && !awaitingRetry;
+  const imageRef = useRef<HTMLImageElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!showImage) return;
+    const image = imageRef.current;
+    if (image?.complete && image.naturalWidth > 0) {
+      setLoaded(true);
+    }
+  }, [showImage, src, retryKey]);
 
   return (
     <div
@@ -114,6 +128,7 @@ export function LazyThumbnail({
       {showImage ? (
         <img
           key={`${src}:${retryKey}`}
+          ref={imageRef}
           src={src}
           alt={alt}
           draggable={false}

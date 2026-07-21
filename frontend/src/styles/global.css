@@ -301,6 +301,9 @@ button:disabled {
   color: #e8edf5;
   text-align: left;
   font-size: 0.9rem;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .user-menu-item:hover,
@@ -361,11 +364,25 @@ button:disabled {
 }
 
 .toolbar-control-label {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.35rem;
+  height: 0.85rem;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #8b98ad;
+  line-height: 1;
+}
+
+.toolbar-control-label > span:first-child {
+  grid-area: 1 / 1;
+}
+
+.toolbar-control-label > span.is-hidden {
+  visibility: hidden;
 }
 
 .toolbar-control-select {
@@ -390,9 +407,39 @@ button:disabled {
   background-repeat: no-repeat;
 }
 
+.toolbar-control-select-wide {
+  max-width: 12.5rem;
+}
+
 .toolbar-control-select:focus {
   outline: none;
   box-shadow: 0 0 0 2px rgba(142, 181, 255, 0.35);
+}
+
+.toolbar-control.is-busy {
+  border-color: rgba(142, 181, 255, 0.4);
+}
+
+.toolbar-control-spinner {
+  grid-area: 1 / 1;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 1.5px solid rgba(142, 181, 255, 0.25);
+  border-top-color: #8eb5ff;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toolbar-control-spinner.is-visible {
+  opacity: 1;
+  animation: toolbar-spin 0.7s linear infinite;
+}
+
+@keyframes toolbar-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .toolbar-toggle {
