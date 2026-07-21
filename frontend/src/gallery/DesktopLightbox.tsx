@@ -168,7 +168,7 @@ export function DesktopLightbox({
       index={index}
       slides={slides}
       plugins={[Video, Zoom]}
-      zoom={{ scrollToZoom: true }}
+      zoom={{ scrollToZoom: true, maxZoomPixelRatio: 4, maxZoom: 20 }}
       toolbar={{
         buttons: [
           <GalleryQualitySelect

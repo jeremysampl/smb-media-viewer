@@ -364,7 +364,6 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
       } as React.CSSProperties)
     : undefined;
 
-  const denseGrid = isMobile && columns >= 4;
   const showIndexBanner =
     !loading && !error && indexingActive && !indexBannerDismissed;
   const showSelectionChrome = selectMode;
@@ -430,10 +429,9 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
           {sortedEntries.map((entry) => {
             const isMedia = entry.type === 'image' || entry.type === 'video';
             const showMeta =
-              (entry.type === 'folder' ||
-                entry.type === 'file' ||
-                showGridDetails) &&
-              !denseGrid;
+              entry.type === 'folder' ||
+              entry.type === 'file' ||
+              showGridDetails;
             const selected = selectedPaths.has(entry.path);
 
             return (
@@ -441,7 +439,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
                 key={entry.path}
                 type="button"
                 className={`file-card ${entry.type}${
-                  isMedia && (!showGridDetails || denseGrid) ? ' compact' : ''
+                  isMedia && !showGridDetails ? ' compact' : ''
                 }${selected ? ' is-selected' : ''}`}
                 data-media-path={isMedia ? entry.path : undefined}
                 aria-pressed={selectMode ? selected : undefined}

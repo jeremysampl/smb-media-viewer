@@ -1,7 +1,8 @@
 export const MIN_IMAGE_ZOOM = 1;
-export const MAX_IMAGE_ZOOM = 8;
+export const MAX_IMAGE_ZOOM = 20;
 export const ZOOM_SNAP_THRESHOLD = 1.02;
-export const MAX_ZOOM_PIXEL_RATIO = 1;
+/** Allow zooming past 1:1 native pixels so detail stays inspectable on small screens. */
+export const MAX_ZOOM_PIXEL_RATIO = 4;
 
 export interface ImageZoomState {
   scale: number;

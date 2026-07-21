@@ -4,6 +4,7 @@ import { mediaUrl } from '../api/client';
 import type { BrowseEntry, QualityTier } from '../types';
 import { useQualityPreference } from '../browser/ResolutionSelector';
 import { MediaDetailsPanel } from './MediaDetailsPanel';
+import { prefetchMediaMetadata } from './mediaMetadataCache';
 import { MobileGalleryVideoSlide } from './MobileGalleryVideoSlide';
 import {
   getThumbnailNaturalSize,
@@ -35,10 +36,14 @@ interface MobileGalleryProps {
 
 const SWIPE_THRESHOLD = 72;
 const DISMISS_THRESHOLD = 110;
+const DETAILS_OPEN_THRESHOLD = 72;
 const TAP_MOVE_LIMIT = 12;
 const SWIPE_ANIM_MS = 450;
 const FLYOUT_ANIM_MS = 380;
 const SLIDE_GAP = 16;
+const DETAILS_SHEET_VH = 0.46;
+const DETAILS_SHEET_LANDSCAPE_VH = 0.4;
+const DETAILS_SHEET_LANDSCAPE_MAX_PX = 340;
 
 interface TouchState {
   startX: number;
@@ -104,6 +109,25 @@ function GalleryQualitySelect({
   );
 }
 
+function detailsSheetMaxHeight() {
+  const { innerWidth, innerHeight } = window;
+  const landscape = innerWidth > innerHeight;
+  if (landscape) {
+    return Math.round(
+      Math.min(innerHeight * DETAILS_SHEET_LANDSCAPE_VH, DETAILS_SHEET_LANDSCAPE_MAX_PX),
+    );
+  }
+  // Tablets in portrait: don't let the sheet dominate a tall screen.
+  if (innerWidth >= 768) {
+    return Math.round(Math.min(innerHeight * DETAILS_SHEET_VH, 420));
+  }
+  return Math.round(innerHeight * DETAILS_SHEET_VH);
+}
+
+function clampSheetHeight(value: number, max: number) {
+  return Math.max(0, Math.min(max, value));
+}
+
 function flyoutStyle(rect: FlyoutRect): React.CSSProperties {
   return {
     left: rect.left,
@@ -164,29 +188,86 @@ function activeMediaFlyoutRect(
   activeIndex: number,
 ): DOMRect | null {
   const media = getActiveMedia(stage, activeIndex);
-  if (!media) return null;
-  return mediaContentRect(media);
+  if (media) return mediaContentRect(media);
+
+  // Fallback: full stage (keeps close animation alive if media isn't measurable yet).
+  const stageRect = stage?.getBoundingClientRect();
+  if (!stageRect || stageRect.width <= 0 || stageRect.height <= 0) return null;
+  return stageRect;
+}
+
+function getActiveSlide(stage: HTMLDivElement | null, activeIndex: number) {
+  return stage?.querySelector(
+    `.mobile-gallery-slide-item[data-index="${activeIndex}"]`,
+  ) as HTMLElement | null;
 }
 
 function getActiveImage(stage: HTMLDivElement | null, activeIndex: number) {
-  return stage?.querySelector(
-    `.mobile-gallery-slide-item[data-index="${activeIndex}"] .mobile-gallery-media`,
+  return getActiveSlide(stage, activeIndex)?.querySelector(
+    '.mobile-gallery-media',
   ) as HTMLImageElement | null;
 }
 
+function getActiveVideoPoster(stage: HTMLDivElement | null, activeIndex: number) {
+  return getActiveSlide(stage, activeIndex)?.querySelector(
+    '.mobile-gallery-video-poster',
+  ) as HTMLImageElement | null;
+}
+
+function getActiveVideoPlayer(stage: HTMLDivElement | null, activeIndex: number) {
+  return getActiveSlide(stage, activeIndex)?.querySelector(
+    '.mobile-gallery-video-player',
+  ) as HTMLVideoElement | null;
+}
+
 function getActiveMedia(stage: HTMLDivElement | null, activeIndex: number) {
-  return getActiveImage(stage, activeIndex) as HTMLImageElement | HTMLVideoElement | null;
+  const image = getActiveImage(stage, activeIndex);
+  if (image) return image;
+
+  const video = getActiveVideoPlayer(stage, activeIndex);
+  if (video && video.videoWidth > 0 && video.classList.contains('ready')) {
+    return video;
+  }
+
+  return getActiveVideoPoster(stage, activeIndex);
 }
 
 function getImageZoomContext(stage: HTMLDivElement | null, activeIndex: number) {
   const stageRect = stage?.getBoundingClientRect();
+  const stageWidth = stageRect?.width ?? 0;
+  const stageHeight = stageRect?.height ?? 0;
+
   const image = getActiveImage(stage, activeIndex);
+  if (image?.naturalWidth && image.naturalHeight) {
+    return {
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      stageWidth,
+      stageHeight,
+    };
+  }
+
+  const video = getActiveVideoPlayer(stage, activeIndex);
+  if (video?.videoWidth && video.videoHeight) {
+    return {
+      naturalWidth: video.videoWidth,
+      naturalHeight: video.videoHeight,
+      stageWidth,
+      stageHeight,
+    };
+  }
+
+  const poster = getActiveVideoPoster(stage, activeIndex);
   return {
-    naturalWidth: image?.naturalWidth ?? 0,
-    naturalHeight: image?.naturalHeight ?? 0,
-    stageWidth: stageRect?.width ?? 0,
-    stageHeight: stageRect?.height ?? 0,
+    naturalWidth: poster?.naturalWidth ?? 0,
+    naturalHeight: poster?.naturalHeight ?? 0,
+    stageWidth,
+    stageHeight,
   };
+}
+
+function isZoomableEntry(entry: BrowseEntry | undefined) {
+  return entry?.type === 'image' || entry?.type === 'video';
 }
 
 export function MobileGallery({
@@ -198,6 +279,9 @@ export function MobileGallery({
   const { quality, setQuality, profiles } = useQualityPreference();
   const [index, setIndex] = useState(initialIndex);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [sheetDragY, setSheetDragY] = useState(0);
+  const [isSheetDragging, setIsSheetDragging] = useState(false);
+  const [renderDetailsSheet, setRenderDetailsSheet] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isClosing, setIsClosing] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
@@ -221,6 +305,7 @@ export function MobileGallery({
   const indexRef = useRef(index);
   const isClosingRef = useRef(isClosing);
   const isOpeningRef = useRef(isOpening);
+  const detailsOpenRef = useRef(detailsOpen);
   const mediaCountRef = useRef(0);
   const metricsRef = useRef(metrics);
   const imageZoomRef = useRef(imageZoom);
@@ -230,11 +315,29 @@ export function MobileGallery({
   indexRef.current = index;
   isClosingRef.current = isClosing;
   isOpeningRef.current = isOpening;
+  detailsOpenRef.current = detailsOpen;
   mediaCountRef.current = mediaEntries.length;
   metricsRef.current = metrics;
   imageZoomRef.current = imageZoom;
   dragOffsetRef.current = dragOffset;
   currentEntryRef.current = currentEntry;
+
+  const resetDetailsSheet = useCallback(() => {
+    setDetailsOpen(false);
+    setSheetDragY(0);
+    setIsSheetDragging(false);
+    setRenderDetailsSheet(false);
+  }, []);
+
+  const prefetchNearbyDetails = useCallback(
+    (centerIndex: number) => {
+      for (const offset of [-1, 0, 1]) {
+        const token = mediaEntries[centerIndex + offset]?.token;
+        if (token) prefetchMediaMetadata(token);
+      }
+    },
+    [mediaEntries],
+  );
 
   const clampActiveImageZoom = useCallback((zoom: ImageZoomState) => {
     const context = getImageZoomContext(stageRef.current, indexRef.current);
@@ -287,6 +390,7 @@ export function MobileGallery({
       setIsOpening(false);
       setIsDragging(false);
       setDragOffset({ x: 0, y: 0 });
+      resetDetailsSheet();
       resetImageZoom();
       setFlyout(closingLayer);
 
@@ -309,7 +413,7 @@ export function MobileGallery({
         setFlyout(null);
       }, FLYOUT_ANIM_MS);
     },
-    [mediaEntries, onClose, quality, resetImageZoom],
+    [mediaEntries, onClose, quality, resetDetailsSheet, resetImageZoom],
   );
 
   const animateClose = useCallback(() => {
@@ -351,6 +455,9 @@ export function MobileGallery({
     const entry = mediaEntries[initialIndex];
     setIndex(initialIndex);
     setDetailsOpen(false);
+    setSheetDragY(0);
+    setIsSheetDragging(false);
+    setRenderDetailsSheet(false);
     setControlsVisible(true);
     setIsClosing(false);
     setIsDragging(false);
@@ -404,7 +511,6 @@ export function MobileGallery({
 
   useEffect(() => {
     resetImageZoom();
-    setDetailsOpen(false);
     const entry = mediaEntries[index];
     if (!entry) return;
     setHydratedPaths((previous) => {
@@ -414,6 +520,22 @@ export function MobileGallery({
       return next;
     });
   }, [index, mediaEntries, resetImageZoom]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!detailsOpen && sheetDragY === 0) return;
+    prefetchNearbyDetails(index);
+  }, [open, detailsOpen, sheetDragY, index, prefetchNearbyDetails]);
+
+  useEffect(() => {
+    if (detailsOpen || isSheetDragging || sheetDragY !== 0) {
+      setRenderDetailsSheet(true);
+      return undefined;
+    }
+    if (!renderDetailsSheet) return undefined;
+    const timer = window.setTimeout(() => setRenderDetailsSheet(false), 320);
+    return () => window.clearTimeout(timer);
+  }, [detailsOpen, isSheetDragging, sheetDragY, renderDetailsSheet]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -440,7 +562,8 @@ export function MobileGallery({
 
       if (
         event.touches.length === 2 &&
-        currentEntryRef.current?.type === 'image' &&
+        currentEntryRef.current &&
+        isZoomableEntry(currentEntryRef.current) &&
         canStartPinchZoom(touchRef.current, dragOffsetRef.current.x)
       ) {
         touchRef.current = null;
@@ -464,7 +587,7 @@ export function MobileGallery({
       const touch = event.touches[0];
       if (!touch) return;
 
-      if (imageZoomRef.current.scale > 1 && currentEntryRef.current?.type === 'image') {
+      if (imageZoomRef.current.scale > 1 && isZoomableEntry(currentEntryRef.current)) {
         pinchRef.current = null;
         touchRef.current = {
           startX: touch.clientX,
@@ -495,7 +618,7 @@ export function MobileGallery({
     const onTouchMove = (event: TouchEvent) => {
       if (isClosingRef.current || isOpeningRef.current) return;
 
-      if (event.touches.length >= 2 && currentEntryRef.current?.type === 'image') {
+      if (event.touches.length >= 2 && isZoomableEntry(currentEntryRef.current)) {
         if (!canStartPinchZoom(touchRef.current, dragOffsetRef.current.x)) {
           return;
         }
@@ -582,15 +705,31 @@ export function MobileGallery({
 
       event.preventDefault();
 
-      if (state.axis === 'y' && offsetY > 0) {
-        state.offsetY = offsetY;
-        setIsDragging(true);
-        setDragOffset({ x: 0, y: offsetY });
+      if (state.axis === 'y') {
+        const detailsOpenNow = detailsOpenRef.current;
+        if (detailsOpenNow || offsetY < 0) {
+          if (!detailsOpenNow && offsetY < 0) {
+            prefetchNearbyDetails(indexRef.current);
+          }
+          setIsSheetDragging(true);
+          setIsDragging(true);
+          setSheetDragY(offsetY);
+          setDragOffset({ x: 0, y: 0 });
+          return;
+        }
+
+        if (offsetY > 0) {
+          state.offsetY = offsetY;
+          setIsSheetDragging(false);
+          setIsDragging(true);
+          setDragOffset({ x: 0, y: offsetY });
+        }
         return;
       }
 
       if (state.axis === 'x') {
         state.offsetX = offsetX;
+        setIsSheetDragging(false);
         setIsDragging(true);
         setDragOffset({ x: offsetX, y: 0 });
         pinchRef.current = null;
@@ -626,26 +765,49 @@ export function MobileGallery({
         Math.abs(state.offsetX) > TAP_MOVE_LIMIT || Math.abs(state.offsetY) > TAP_MOVE_LIMIT;
 
       setIsDragging(false);
+      setIsSheetDragging(false);
 
       if (!moved && duration < 320) {
         setControlsVisible((value) => !value);
-        return;
-      }
-
-      if (state.axis === 'y' && state.offsetY > DISMISS_THRESHOLD) {
-        const mediaRect = activeMediaFlyoutRect(stageRef.current, indexRef.current);
-        if (mediaRect) {
-          runFlyoutClose(mediaRect);
-        } else {
-          onClose();
-        }
+        setSheetDragY(0);
         return;
       }
 
       if (state.axis === 'y') {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => setDragOffset({ x: 0, y: 0 }));
-        });
+        const detailsOpenNow = detailsOpenRef.current;
+
+        if (detailsOpenNow) {
+          if (state.offsetY > DETAILS_OPEN_THRESHOLD) {
+            setDetailsOpen(false);
+          }
+          setSheetDragY(0);
+          return;
+        }
+
+        if (state.offsetY < -DETAILS_OPEN_THRESHOLD) {
+          setDetailsOpen(true);
+          setSheetDragY(0);
+          prefetchNearbyDetails(indexRef.current);
+          return;
+        }
+
+        if (state.offsetY > DISMISS_THRESHOLD) {
+          setSheetDragY(0);
+          const mediaRect = activeMediaFlyoutRect(stageRef.current, indexRef.current);
+          if (mediaRect) {
+            runFlyoutClose(mediaRect);
+          } else {
+            onClose();
+          }
+          return;
+        }
+
+        setSheetDragY(0);
+        if (state.offsetY > 0) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => setDragOffset({ x: 0, y: 0 }));
+          });
+        }
         return;
       }
 
@@ -674,13 +836,22 @@ export function MobileGallery({
       stage.removeEventListener('touchend', onTouchEnd);
       stage.removeEventListener('touchcancel', onTouchEnd);
     };
-  }, [open, completeHorizontalSwipe, onClose, runFlyoutClose, resetImageZoom, clampActiveImageZoom]);
+  }, [open, completeHorizontalSwipe, onClose, runFlyoutClose, resetImageZoom, clampActiveImageZoom, prefetchNearbyDetails]);
 
   if (!open || !currentEntry) return null;
 
   const stageWidth = metrics.stageWidth > 0 ? metrics.stageWidth : window.innerWidth;
   const layout = computeTrackLayout(stageWidth, index, dragOffset.x);
-  const isVerticalDismiss = dragOffset.y > 0;
+  const sheetMax = detailsSheetMaxHeight();
+  const baseSheetHeight = detailsOpen ? sheetMax : 0;
+  const sheetHeight = isSheetDragging
+    ? detailsOpen
+      ? clampSheetHeight(sheetMax - sheetDragY, sheetMax)
+      : clampSheetHeight(-sheetDragY, sheetMax)
+    : baseSheetHeight;
+  const showDetailsSheet = sheetHeight > 0;
+  const detailsContentVisible = renderDetailsSheet && Boolean(currentEntry.token);
+  const isVerticalDismiss = dragOffset.y > 0 && !detailsOpen && !isSheetDragging;
   const dragScale = Math.max(0.72, 1 - dragOffset.y / (window.innerHeight * 1.35));
   const trackTransform = `translate3d(${layout.trackX}px, 0, 0)`;
   const hasTrackTransition = !isClosing && !isOpening && !isDragging;
@@ -697,9 +868,16 @@ export function MobileGallery({
     <div
       className={`mobile-gallery${controlsVisible ? ' controls-visible' : ''}${
         isClosing ? ' closing' : ''
-      }${isOpening ? ' opening' : ''}`}
+      }${isOpening ? ' opening' : ''}${isSheetDragging ? ' sheet-dragging' : ''}${
+        detailsOpen || sheetHeight > 0 ? ' details-open' : ''
+      }`}
       role="dialog"
       aria-modal="true"
+      style={
+        {
+          '--details-sheet-height': `${sheetHeight}px`,
+        } as React.CSSProperties
+      }
     >
       <div
         className={`mobile-gallery-backdrop${backdropClass}`}
@@ -716,7 +894,7 @@ export function MobileGallery({
             animateClose();
           }}
         >
-          ←
+          <span aria-hidden="true">←</span>
         </button>
         <div className="mobile-gallery-tools">
           <GalleryQualitySelect
@@ -726,14 +904,21 @@ export function MobileGallery({
           />
           <button
             type="button"
-            className="mobile-gallery-details-btn"
+            className={`mobile-gallery-details-btn${detailsOpen ? ' active' : ''}`}
             aria-label="Details"
+            aria-pressed={detailsOpen}
             onClick={(event) => {
               event.stopPropagation();
-              setDetailsOpen((value) => !value);
+              setSheetDragY(0);
+              setIsSheetDragging(false);
+              setDetailsOpen((value) => {
+                const next = !value;
+                if (next) prefetchNearbyDetails(index);
+                return next;
+              });
             }}
           >
-            ⓘ
+            <span aria-hidden="true">ⓘ</span>
           </button>
         </div>
       </div>
@@ -800,6 +985,11 @@ export function MobileGallery({
                     controlsVisible={controlsVisible}
                     previewSrc={previewSrc}
                     loadFullMedia={hydratedPaths.has(entry.path)}
+                    style={
+                      isActive
+                        ? { transform: imageZoomTransform(imageZoom) }
+                        : undefined
+                    }
                   />
                 ) : entry.token ? (
                   <img
@@ -849,12 +1039,14 @@ export function MobileGallery({
         </div>
       ) : null}
 
-      {detailsOpen && currentEntry.token ? (
-        <MediaDetailsPanel
-          token={currentEntry.token}
-          onClose={() => setDetailsOpen(false)}
-        />
-      ) : null}
+      <div
+        className={`mobile-gallery-details-sheet${showDetailsSheet ? ' visible' : ''}`}
+        aria-hidden={!showDetailsSheet}
+      >
+        {detailsContentVisible && currentEntry.token ? (
+          <MediaDetailsPanel token={currentEntry.token} variant="sheet" />
+        ) : null}
+      </div>
     </div>
   );
 

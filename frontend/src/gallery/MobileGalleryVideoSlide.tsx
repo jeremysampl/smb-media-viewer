@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { mediaUrl } from '../api/client';
 import type { BrowseEntry, QualityTier } from '../types';
 
@@ -12,6 +12,7 @@ interface MobileGalleryVideoSlideProps {
   previewSrc?: string;
   /** True once this slide has been opened — keeps full media while swiping away. */
   loadFullMedia?: boolean;
+  style?: CSSProperties;
 }
 
 export function MobileGalleryVideoSlide({
@@ -22,6 +23,7 @@ export function MobileGalleryVideoSlide({
   controlsVisible,
   previewSrc,
   loadFullMedia = false,
+  style,
 }: MobileGalleryVideoSlideProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mediaReady, setMediaReady] = useState(false);
@@ -63,7 +65,7 @@ export function MobileGalleryVideoSlide({
   const posterSrc = isActive || isNearby || loadFullMedia ? posterUrl : '';
 
   return (
-    <div className="mobile-gallery-video-frame">
+    <div className="mobile-gallery-video-frame" style={style}>
       {posterSrc ? (
         <img
           className={`mobile-gallery-video-poster${showPoster ? '' : ' hidden'}`}

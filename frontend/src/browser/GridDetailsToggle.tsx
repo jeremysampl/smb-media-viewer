@@ -1,11 +1,11 @@
 import { useState } from 'react';
+import { getIsMobileUi } from '../hooks/useIsMobile';
 
 const STORAGE_KEY = 'smb-grid-show-details';
-const MOBILE_BREAKPOINT = 720;
 
 function getDefaultShowDetails(): boolean {
   if (typeof window === 'undefined') return true;
-  return !window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches;
+  return !getIsMobileUi();
 }
 
 export function useGridDetailsPreference(): {
