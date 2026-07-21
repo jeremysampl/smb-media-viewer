@@ -801,15 +801,42 @@ button.breadcrumb-chip:focus-visible,
   line-height: 1;
 }
 
-.file-icon {
+.file-type-icon {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: clamp(2.2rem, 38%, 3.5rem);
-  line-height: 1;
-  opacity: 0.92;
+  color: var(--file-icon-color, #7dd3fc);
+}
+
+.file-type-icon-svg {
+  width: clamp(2.6rem, 48%, 4.25rem);
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
+}
+
+.file-type-icon-body {
+  fill: color-mix(in srgb, var(--file-icon-color) 18%, #121820);
+  stroke: color-mix(in srgb, var(--file-icon-color) 72%, #dbe7ff);
+  stroke-width: 1.35;
+}
+
+.file-type-icon-fold {
+  fill: color-mix(in srgb, var(--file-icon-color) 28%, #1a2330);
+  stroke: color-mix(in srgb, var(--file-icon-color) 72%, #dbe7ff);
+  stroke-width: 1.35;
+  stroke-linejoin: round;
+}
+
+.file-type-icon-badge {
+  fill: var(--file-icon-color);
+}
+
+.file-type-icon-label {
+  fill: #0b1018;
+  letter-spacing: -0.03em;
 }
 
 .selection-dock {

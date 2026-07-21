@@ -7,6 +7,7 @@ import { Breadcrumbs } from './Breadcrumbs';
 import { browsePathToUrl, urlSplatToBrowsePath } from './browsePath';
 import { MediaGallery } from '../gallery/MediaGallery';
 import { LazyThumbnail } from './LazyThumbnail';
+import { FileTypeIcon } from './FileTypeIcon';
 import { ResolutionSelector, useQualityPreference } from './ResolutionSelector';
 import { SortSelector, useSortPreference } from './SortSelector';
 import { FileTypeSelector } from './FileTypeSelector';
@@ -497,9 +498,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
                       📁
                     </div>
                   ) : entry.type === 'file' ? (
-                    <div className="file-icon" aria-hidden>
-                      📄
-                    </div>
+                    <FileTypeIcon format={entry.format} />
                   ) : entry.token && entry.type === 'image' ? (
                     <LazyThumbnail
                       key={`${entry.path}:${sort}:${fileTypeFilter}`}
