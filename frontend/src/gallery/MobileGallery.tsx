@@ -120,16 +120,24 @@ function viewportFlyoutRect(): FlyoutRect {
 function buildFlyoutLayer(
   entry: BrowseEntry,
   rect: FlyoutRect,
-  quality: QualityTier,
+  _quality: QualityTier,
 ): FlyoutLayer | null {
   if (!entry.token) return null;
-  const kind = entry.type === 'video' ? 'video' : 'image';
+  // Always morph with a cached still (thumb/poster) via <img> — avoids empty/unload
+  // full-res frames and broken <video src=poster> during the open animation.
   const src =
-    kind === 'video'
-      ? mediaUrl(entry.token, 'video', quality)
-      : mediaUrl(entry.token, 'image', quality);
-  const poster = kind === 'video' ? mediaUrl(entry.token, 'poster') : undefined;
-  return { kind, src, poster, rect };
+    entry.type === 'video'
+      ? mediaUrl(entry.token, 'poster')
+      : entry.thumbnailUrl ?? mediaUrl(entry.token, 'image', 'very_low');
+  return { kind: 'image', src, rect };
+}
+
+function stageFlyoutRect(stage: HTMLDivElement | null): FlyoutRect {
+  const rect = stage?.getBoundingClientRect();
+  if (!rect || rect.width <= 0 || rect.height <= 0) {
+    return viewportFlyoutRect();
+  }
+  return rectFromDomRect(rect, 0);
 }
 
 function getActiveImage(stage: HTMLDivElement | null, activeIndex: number) {
@@ -170,6 +178,7 @@ export function MobileGallery({
   const [flyout, setFlyout] = useState<FlyoutLayer | null>(null);
   const [metrics, setMetrics] = useState<TrackMetrics>({ stageWidth: 0 });
   const [imageZoom, setImageZoom] = useState<ImageZoomState>(DEFAULT_IMAGE_ZOOM);
+  const [hydratedPaths, setHydratedPaths] = useState<Set<string>>(() => new Set());
 
   const stageRef = useRef<HTMLDivElement>(null);
   const touchRef = useRef<TouchState | null>(null);
@@ -305,6 +314,7 @@ export function MobileGallery({
   useLayoutEffect(() => {
     if (!open) {
       setIsOpening(false);
+      setHydratedPaths(new Set());
       return;
     }
 
@@ -318,6 +328,7 @@ export function MobileGallery({
     setIsDragging(false);
     setDragOffset({ x: 0, y: 0 });
     resetImageZoom();
+    setHydratedPaths(entry ? new Set([entry.path]) : new Set());
 
     if (!entry) {
       setIsOpening(false);
@@ -342,10 +353,9 @@ export function MobileGallery({
     let openTimer: number | undefined;
     const raf = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const mediaRect = getActiveMedia(stageRef.current, initialIndex)?.getBoundingClientRect();
-        const targetRect = mediaRect
-          ? rectFromDomRect(mediaRect, 0)
-          : viewportFlyoutRect();
+        // Don't measure the underlying <img> — it may still be unloaded (0×0)
+        // which made the flyout animate toward a tiny rect (looked like zooming out).
+        const targetRect = stageFlyoutRect(stageRef.current);
         setFlyout((current) =>
           current ? { ...current, rect: targetRect } : null,
         );
@@ -366,7 +376,15 @@ export function MobileGallery({
   useEffect(() => {
     resetImageZoom();
     setDetailsOpen(false);
-  }, [index, resetImageZoom]);
+    const entry = mediaEntries[index];
+    if (!entry) return;
+    setHydratedPaths((previous) => {
+      if (previous.has(entry.path)) return previous;
+      const next = new Set(previous);
+      next.add(entry.path);
+      return next;
+    });
+  }, [index, mediaEntries, resetImageZoom]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -704,7 +722,11 @@ export function MobileGallery({
         >
           {mediaEntries.map((entry, slideIndex) => {
             const isActive = slideIndex === index;
-            const isNearby = Math.abs(slideIndex - index) <= 1;
+            const distance = Math.abs(slideIndex - index);
+            // Keep adjacent slide shells for swipe animation, but only fetch
+            // full-quality media for the active slide (neighbors reuse grid thumbs).
+            const isAdjacent = distance === 1;
+            const showMedia = isActive || isAdjacent;
             const slideStyle: React.CSSProperties = {
               width: layout.slideWidth,
             };
@@ -725,6 +747,14 @@ export function MobileGallery({
               slideStyle.visibility = 'hidden';
             }
 
+            const previewSrc =
+              entry.thumbnailUrl ??
+              (entry.token
+                ? entry.type === 'video'
+                  ? mediaUrl(entry.token, 'poster')
+                  : mediaUrl(entry.token, 'image', 'very_low')
+                : '');
+
             return (
               <div
                 key={entry.path}
@@ -732,18 +762,24 @@ export function MobileGallery({
                 data-index={slideIndex}
                 style={slideStyle}
               >
-                {!isNearby ? null : entry.type === 'video' && entry.token ? (
+                {!showMedia ? null : entry.type === 'video' && entry.token ? (
                   <MobileGalleryVideoSlide
                     entry={entry}
                     isActive={isActive}
-                    isNearby={Math.abs(slideIndex - index) === 1}
+                    isNearby={isAdjacent}
                     quality={quality}
                     controlsVisible={controlsVisible}
+                    previewSrc={previewSrc}
+                    loadFullMedia={hydratedPaths.has(entry.path)}
                   />
                 ) : entry.token ? (
                   <img
                     className="mobile-gallery-media"
-                    src={mediaUrl(entry.token, 'image', quality)}
+                    src={
+                      hydratedPaths.has(entry.path)
+                        ? mediaUrl(entry.token, 'image', quality)
+                        : previewSrc
+                    }
                     alt={entry.name}
                     draggable={false}
                     style={

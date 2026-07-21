@@ -8,6 +8,10 @@ interface MobileGalleryVideoSlideProps {
   isNearby: boolean;
   quality: QualityTier;
   controlsVisible: boolean;
+  /** Already-cached grid thumb/poster for adjacent slides (no full video fetch). */
+  previewSrc?: string;
+  /** True once this slide has been opened — keeps full media while swiping away. */
+  loadFullMedia?: boolean;
 }
 
 export function MobileGalleryVideoSlide({
@@ -16,11 +20,14 @@ export function MobileGalleryVideoSlide({
   isNearby,
   quality,
   controlsVisible,
+  previewSrc,
+  loadFullMedia = false,
 }: MobileGalleryVideoSlideProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [mediaReady, setMediaReady] = useState(false);
-  const posterUrl = entry.token ? mediaUrl(entry.token, 'poster') : '';
-  const shouldLoadVideo = isActive || isNearby;
+  const posterUrl =
+    previewSrc || (entry.token ? mediaUrl(entry.token, 'poster') : '');
+  const shouldLoadVideo = loadFullMedia;
 
   useEffect(() => {
     setMediaReady(false);
@@ -53,7 +60,7 @@ export function MobileGalleryVideoSlide({
   if (!entry.token) return null;
 
   const showPoster = !isActive || !mediaReady;
-  const posterSrc = isActive || isNearby ? posterUrl : '';
+  const posterSrc = isActive || isNearby || loadFullMedia ? posterUrl : '';
 
   return (
     <div className="mobile-gallery-video-frame">
@@ -73,7 +80,7 @@ export function MobileGalleryVideoSlide({
           controls={controlsVisible && isActive && mediaReady}
           playsInline
           muted={!isActive}
-          preload={isActive ? 'auto' : 'metadata'}
+          preload="auto"
           onLoadedData={() => setMediaReady(true)}
           onCanPlay={() => setMediaReady(true)}
         />

@@ -76,6 +76,12 @@ function DetailsButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+function previewFor(entry: BrowseEntry): string {
+  if (!entry.token) return '';
+  if (entry.type === 'video') return mediaUrl(entry.token, 'poster');
+  return entry.thumbnailUrl ?? mediaUrl(entry.token, 'image', 'very_low');
+}
+
 export function DesktopLightbox({
   entries,
   initialIndex,
@@ -85,47 +91,75 @@ export function DesktopLightbox({
   const { quality, setQuality, profiles } = useQualityPreference();
   const [index, setIndex] = useState(initialIndex);
   const [detailsOpen, setDetailsOpen] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setIndex(initialIndex);
-      setDetailsOpen(false);
-    }
-  }, [open, initialIndex]);
-
-  useEffect(() => {
-    setDetailsOpen(false);
-  }, [index]);
+  /** Paths that have been the active slide — keep full-quality src so swipe-away doesn't swap renderers/src. */
+  const [hydratedPaths, setHydratedPaths] = useState<Set<string>>(() => new Set());
 
   const mediaEntries = useMemo(
     () => entries.filter((entry) => entry.type === 'image' || entry.type === 'video'),
     [entries],
   );
 
+  useEffect(() => {
+    if (!open) {
+      setHydratedPaths(new Set());
+      return;
+    }
+    setIndex(initialIndex);
+    setDetailsOpen(false);
+    const initial = mediaEntries[initialIndex];
+    setHydratedPaths(initial ? new Set([initial.path]) : new Set());
+  }, [open, initialIndex, mediaEntries]);
+
+  useEffect(() => {
+    setDetailsOpen(false);
+  }, [index]);
+
+  useEffect(() => {
+    const entry = mediaEntries[index];
+    if (!entry) return;
+    setHydratedPaths((previous) => {
+      if (previous.has(entry.path)) return previous;
+      const next = new Set(previous);
+      next.add(entry.path);
+      return next;
+    });
+  }, [index, mediaEntries]);
+
   const currentEntry = mediaEntries[index];
 
   const slides = useMemo(() => {
     return mediaEntries.map((entry) => {
+      const preview = previewFor(entry);
+      const useFull = hydratedPaths.has(entry.path);
+
       if (entry.type === 'video' && entry.token) {
         return {
           type: 'video' as const,
-          sources: [
-            {
-              src: mediaUrl(entry.token, 'video', quality),
-              type: 'video/mp4',
-            },
-          ],
-          poster: mediaUrl(entry.token, 'poster'),
+          // Only hydrated (visited/current) slides get a video source — neighbors stay poster-only.
+          sources: useFull
+            ? [
+                {
+                  src: mediaUrl(entry.token, 'video', quality),
+                  type: 'video/mp4',
+                },
+              ]
+            : [],
+          poster: preview || mediaUrl(entry.token, 'poster'),
         };
       }
 
       return {
-        src: entry.token ? mediaUrl(entry.token, 'image', quality) : '',
+        // Same ImageSlide chrome for every offset; only the URL differs until first view.
+        src: entry.token
+          ? useFull
+            ? mediaUrl(entry.token, 'image', quality)
+            : preview
+          : '',
         alt: entry.name,
         title: entry.name,
       };
     });
-  }, [mediaEntries, quality]);
+  }, [mediaEntries, quality, hydratedPaths]);
 
   return (
     <Lightbox
@@ -149,7 +183,7 @@ export function DesktopLightbox({
       }}
       on={{ view: ({ index: nextIndex }) => setIndex(nextIndex) }}
       controller={{ closeOnBackdropClick: true }}
-      carousel={{ finite: mediaEntries.length <= 1 }}
+      carousel={{ finite: mediaEntries.length <= 1, preload: 1 }}
       animation={{ swipe: 500 }}
       render={{
         controls: () =>

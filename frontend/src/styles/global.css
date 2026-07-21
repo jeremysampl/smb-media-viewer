@@ -592,7 +592,7 @@ button:disabled {
   flex: 0 0 auto;
   height: 100%;
   display: grid;
-  place-items: center;
+  place-items: stretch;
   transform-origin: center center;
 }
 
@@ -617,6 +617,7 @@ button:disabled {
   z-index: 10002;
   overflow: hidden;
   pointer-events: none;
+  background: #000;
   transition:
     left 380ms cubic-bezier(0.33, 1, 0.68, 1),
     top 380ms cubic-bezier(0.33, 1, 0.68, 1),
@@ -628,22 +629,20 @@ button:disabled {
 .mobile-gallery-flyout-media {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center center;
   display: block;
   user-select: none;
   -webkit-user-drag: none;
 }
 
-.mobile-gallery.opening .mobile-gallery-flyout-media {
-  object-fit: contain;
-}
-
 .mobile-gallery-media {
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
-  width: auto;
-  height: auto;
   object-fit: contain;
+  object-position: center center;
   user-select: none;
   -webkit-user-drag: none;
   transform-origin: center center;
