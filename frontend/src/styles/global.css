@@ -97,6 +97,54 @@ button:disabled {
   margin: 0;
 }
 
+.index-snackbar {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  z-index: 9000;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  width: min(36rem, calc(100vw - 1.5rem));
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: rgba(24, 32, 46, 0.96);
+  border: 1px solid rgba(255, 196, 86, 0.35);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+  animation: index-snackbar-in 220ms ease-out;
+}
+
+.index-snackbar p {
+  margin: 0;
+  flex: 1;
+  color: #f3e6c8;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.index-snackbar-dismiss {
+  flex-shrink: 0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: #d7c9a6;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+@keyframes index-snackbar-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0.6rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .top-bar {
   display: flex;
   justify-content: space-between;

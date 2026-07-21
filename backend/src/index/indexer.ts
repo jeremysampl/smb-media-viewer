@@ -19,6 +19,7 @@ export interface IndexJob {
 const INDEX_CONCURRENCY = 2;
 const queue: IndexJob[] = [];
 const queuedPaths = new Set<string>();
+const inFlight = new Map<string, Promise<{ filePath: string; contentType: string } | null>>();
 let activeWorkers = 0;
 
 function thumbKeyFor(sourcePath: string, mtimeMs: number, kind: string): string {
@@ -28,24 +29,57 @@ function thumbKeyFor(sourcePath: string, mtimeMs: number, kind: string): string 
     .digest('hex');
 }
 
-function runFfmpeg(args: string[]): Promise<void> {
+function extractPosterJpeg(
+  sourcePath: string,
+  seekSeconds: string,
+  maxDim: number,
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const child = spawn('ffmpeg', ['-y', ...args], {
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
+    const child = spawn(
+      'ffmpeg',
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-y',
+        '-ss',
+        seekSeconds,
+        '-i',
+        sourcePath,
+        '-frames:v',
+        '1',
+        '-vf',
+        `scale=w=${maxDim}:h=${maxDim}:force_original_aspect_ratio=decrease`,
+        '-f',
+        'image2pipe',
+        '-vcodec',
+        'mjpeg',
+        'pipe:1',
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
 
+    const chunks: Buffer[] = [];
     let stderr = '';
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
     child.stderr?.on('data', (chunk: Buffer) => {
       stderr += chunk.toString();
     });
-
     child.on('error', reject);
     child.on('close', (code) => {
-      if (code === 0) {
-        resolve();
+      const buffer = Buffer.concat(chunks);
+      if (code !== 0) {
+        reject(new Error(stderr.trim() || `ffmpeg exited with code ${code}`));
         return;
       }
-      reject(new Error(stderr || `ffmpeg exited with code ${code}`));
+      if (buffer.length === 0) {
+        reject(new Error(stderr.trim() || 'ffmpeg produced an empty poster frame'));
+        return;
+      }
+      resolve(buffer);
     });
   });
 }
@@ -75,38 +109,28 @@ async function generateVideoPoster(
   sourcePath: string,
   thumbPath: string,
 ): Promise<void> {
-  // Extension must be .jpg — ffmpeg rejects *.jpg.tmp as an unknown muxer.
-  const tempJpg = `${thumbPath}.${process.pid}.tmp.jpg`;
+  const maxDim = getQualityProfile('very_low').imageMaxDimension ?? 320;
   await fs.mkdir(path.dirname(thumbPath), { recursive: true });
 
-  try {
-    await runFfmpeg([
-      '-ss',
-      '00:00:01',
-      '-i',
-      sourcePath,
-      '-frames:v',
-      '1',
-      '-q:v',
-      '4',
-      tempJpg,
-    ]);
-
-    const maxDim = getQualityProfile('very_low').imageMaxDimension ?? 320;
-    const buffer = await sharp(tempJpg, { failOn: 'none' })
-      .rotate()
-      .resize({
-        width: maxDim,
-        height: maxDim,
-        fit: 'inside',
-        withoutEnlargement: true,
-      })
-      .webp({ quality: 70 })
-      .toBuffer();
-    await writeAtomic(thumbPath, buffer);
-  } finally {
-    await fs.unlink(tempJpg).catch(() => undefined);
+  let lastError: unknown;
+  // Prefer ~1s in; fall back to the first frame for short / hard-to-seek clips.
+  for (const seek of ['1', '0']) {
+    try {
+      const jpeg = await extractPosterJpeg(sourcePath, seek, maxDim);
+      const buffer = await sharp(jpeg, { failOn: 'none' })
+        .rotate()
+        .webp({ quality: 70 })
+        .toBuffer();
+      await writeAtomic(thumbPath, buffer);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
   }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Failed to extract video poster');
 }
 
 async function indexOne(
@@ -120,53 +144,71 @@ async function indexOne(
 
   const thumbKey = thumbKeyFor(job.absolutePath, job.mtimeMs, job.kind);
   const thumbPath = getThumbPath(thumbKey);
+  const flightKey = `${job.kind}:${thumbKey}`;
 
-  let captureTime: string | null = null;
-  let duration: number | null = null;
-  let thumbReady = false;
-
-  if (job.kind === 'image') {
-    captureTime = (await getImageCaptureTime(job.absolutePath)) ?? null;
-  } else {
-    const info = await getVideoBrowseInfo(job.absolutePath);
-    captureTime = info.captureTime ?? null;
-    duration = info.duration ?? null;
-  }
-
-  try {
-    await fs.access(thumbPath);
-    thumbReady = true;
-  } catch {
-    try {
-      if (job.kind === 'image') {
-        await generateImageThumb(job.absolutePath, thumbPath);
-      } else {
-        await generateVideoPoster(job.absolutePath, thumbPath);
-      }
-      thumbReady = true;
-    } catch (error) {
-      console.error(`[index] Thumb failed for ${job.absolutePath}:`, error);
-    }
-  }
-
-  upsertMediaIndexRow({
-    absolutePath: job.absolutePath,
-    mtimeMs: job.mtimeMs,
-    size: job.size,
-    kind: job.kind,
-    thumbKey: thumbReady ? thumbKey : null,
-    captureTime,
-    duration,
-  });
-
-  if (!thumbReady) {
+  const existing = inFlight.get(flightKey);
+  if (existing) {
+    const shared = await existing;
+    if (shared) return shared;
     if (options.requireThumb) {
       throw new Error(`Failed to generate index thumb for ${job.absolutePath}`);
     }
     return null;
   }
 
-  return { filePath: thumbPath, contentType: 'image/webp' };
+  const work = (async () => {
+    let captureTime: string | null = null;
+    let duration: number | null = null;
+    let thumbReady = false;
+
+    if (job.kind === 'image') {
+      captureTime = (await getImageCaptureTime(job.absolutePath)) ?? null;
+    } else {
+      const info = await getVideoBrowseInfo(job.absolutePath);
+      captureTime = info.captureTime ?? null;
+      duration = info.duration ?? null;
+    }
+
+    try {
+      await fs.access(thumbPath);
+      thumbReady = true;
+    } catch {
+      try {
+        if (job.kind === 'image') {
+          await generateImageThumb(job.absolutePath, thumbPath);
+        } else {
+          await generateVideoPoster(job.absolutePath, thumbPath);
+        }
+        thumbReady = true;
+      } catch (error) {
+        console.error(`[index] Thumb failed for ${job.absolutePath}:`, error);
+      }
+    }
+
+    upsertMediaIndexRow({
+      absolutePath: job.absolutePath,
+      mtimeMs: job.mtimeMs,
+      size: job.size,
+      kind: job.kind,
+      thumbKey: thumbReady ? thumbKey : null,
+      captureTime,
+      duration,
+    });
+
+    if (!thumbReady) return null;
+    return { filePath: thumbPath, contentType: 'image/webp' };
+  })();
+
+  inFlight.set(flightKey, work);
+  try {
+    const result = await work;
+    if (!result && options.requireThumb) {
+      throw new Error(`Failed to generate index thumb for ${job.absolutePath}`);
+    }
+    return result;
+  } finally {
+    inFlight.delete(flightKey);
+  }
 }
 
 function pumpQueue(): void {

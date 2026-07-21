@@ -37,10 +37,17 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   const { quality, setQuality, profiles } = useQualityPreference();
   const { sort, setSort } = useSortPreference();
   const { showGridDetails, setShowGridDetails } = useGridDetailsPreference();
+  const [indexBannerDismissed, setIndexBannerDismissed] = useState(false);
+  const [indexingActive, setIndexingActive] = useState(false);
 
   function navigateToPath(path: string) {
     navigate(browsePathToUrl(path));
   }
+
+  useEffect(() => {
+    setIndexBannerDismissed(false);
+    setIndexingActive(false);
+  }, [currentPath]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -86,17 +93,26 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   // Soft-refresh while background indexing fills in captureTime / duration.
   // Keep existing tokens so thumbnail <img> src values do not change (avoids RAM spikes).
   useEffect(() => {
-    if (loading || error || !needsIndexRefresh) return undefined;
+    if (loading || error || !needsIndexRefresh) {
+      setIndexingActive(false);
+      return undefined;
+    }
 
+    setIndexingActive(true);
     let cancelled = false;
     let attempts = 0;
     let stagnantRounds = 0;
     const maxAttempts = 12;
 
+    const stop = () => {
+      if (!cancelled) setIndexingActive(false);
+      window.clearInterval(timer);
+    };
+
     const timer = window.setInterval(() => {
       attempts += 1;
       if (attempts > maxAttempts) {
-        window.clearInterval(timer);
+        stop();
         return;
       }
 
@@ -146,7 +162,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
             if (filled === 0) {
               stagnantRounds += 1;
               if (stagnantRounds >= 3) {
-                window.clearInterval(timer);
+                stop();
               }
             } else {
               stagnantRounds = 0;
@@ -161,6 +177,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      setIndexingActive(false);
     };
   }, [currentPath, loading, error, needsIndexRefresh]);
 
@@ -189,6 +206,8 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
     : undefined;
 
   const denseGrid = isMobile && columns >= 4;
+  const showIndexBanner =
+    !loading && !error && indexingActive && !indexBannerDismissed;
 
   return (
     <div className="browser-page">
@@ -218,6 +237,23 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
 
       {loading ? <p className="status">Loading...</p> : null}
       {error ? <p className="error">{error}</p> : null}
+
+      {showIndexBanner ? (
+        <div className="index-snackbar" role="status" aria-live="polite">
+          <p>
+            Still reading capture dates from EXIF. Items may shift as that data
+            arrives{sort === 'date_desc' || sort === 'date_asc' ? ' (especially with date sort)' : ''}.
+          </p>
+          <button
+            type="button"
+            className="index-snackbar-dismiss"
+            aria-label="Dismiss"
+            onClick={() => setIndexBannerDismissed(true)}
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       {!loading && !error ? (
         <div
