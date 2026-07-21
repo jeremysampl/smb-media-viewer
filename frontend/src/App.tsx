@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { LoginPage } from './auth/LoginPage';
 import { BrowserPage } from './browser/BrowserPage';
+import { QualityPreferenceProvider } from './browser/ResolutionSelector';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { username, loading } = useAuth();
@@ -18,19 +19,21 @@ export default function App() {
   const { username, logout } = useAuth();
 
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={username ? <Navigate to="/" replace /> : <LoginPage />}
-      />
-      <Route
-        path="/*"
-        element={
-          <ProtectedRoute>
-            <BrowserPage username={username!} onLogout={logout} />
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+    <QualityPreferenceProvider>
+      <Routes>
+        <Route
+          path="/login"
+          element={username ? <Navigate to="/" replace /> : <LoginPage />}
+        />
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <BrowserPage username={username!} onLogout={logout} />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </QualityPreferenceProvider>
   );
 }

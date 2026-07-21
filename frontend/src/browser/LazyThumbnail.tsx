@@ -1,16 +1,33 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 interface LazyThumbnailProps {
   src: string;
   alt: string;
   /** Extra rows to preload above/below the viewport */
   bufferRows?: number;
+  /** Change this when grid order/layout changes so visibility is rechecked */
+  layoutKey?: string | number;
 }
 
-const DEFAULT_CARD_HEIGHT = 220;
+const DEFAULT_CARD_HEIGHT = 160;
 const MAX_RETRIES = 3;
 
-export function LazyThumbnail({ src, alt, bufferRows = 2 }: LazyThumbnailProps) {
+function isNearViewport(element: HTMLElement, margin: number): boolean {
+  const rect = element.getBoundingClientRect();
+  return rect.bottom > -margin && rect.top < window.innerHeight + margin;
+}
+
+function marginFor(element: HTMLElement, bufferRows: number): number {
+  const height = element.getBoundingClientRect().height;
+  return bufferRows * (height > 0 ? height : DEFAULT_CARD_HEIGHT);
+}
+
+export function LazyThumbnail({
+  src,
+  alt,
+  bufferRows = 1,
+  layoutKey,
+}: LazyThumbnailProps) {
   const ref = useRef<HTMLDivElement>(null);
   const retryCountRef = useRef(0);
   const [inView, setInView] = useState(false);
@@ -31,18 +48,45 @@ export function LazyThumbnail({ src, alt, bufferRows = 2 }: LazyThumbnailProps) 
     const element = ref.current;
     if (!element) return undefined;
 
-    const margin = bufferRows * DEFAULT_CARD_HEIGHT;
     const observer = new IntersectionObserver(
       ([entry]) => {
         setInView(entry.isIntersecting);
       },
-      { rootMargin: `${margin}px 0px` },
+      { rootMargin: `${marginFor(element, bufferRows)}px 0px` },
     );
     observer.observe(element);
-    return () => observer.disconnect();
-  }, [bufferRows]);
 
-  // Drop decoded bitmap when scrolled far away to reclaim memory.
+    // Initial callback can be delayed; measure immediately too.
+    setInView(isNearViewport(element, marginFor(element, bufferRows)));
+
+    return () => observer.disconnect();
+  }, [bufferRows, layoutKey, src]);
+
+  // Sort/reorder: drop decoded images first, then re-measure after layout settles.
+  useLayoutEffect(() => {
+    if (layoutKey === undefined) return undefined;
+
+    setInView(false);
+    setLoaded(false);
+
+    let cancelled = false;
+    let innerFrame = 0;
+    const outerFrame = window.requestAnimationFrame(() => {
+      innerFrame = window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        const element = ref.current;
+        if (!element) return;
+        setInView(isNearViewport(element, marginFor(element, bufferRows)));
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(outerFrame);
+      window.cancelAnimationFrame(innerFrame);
+    };
+  }, [layoutKey, bufferRows]);
+
   useEffect(() => {
     if (!inView) {
       setLoaded(false);

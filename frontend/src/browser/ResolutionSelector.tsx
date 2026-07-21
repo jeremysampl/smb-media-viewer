@@ -1,14 +1,26 @@
-import { useEffect, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { getQualityProfiles } from '../api/client';
 import type { QualityProfile, QualityTier } from '../types';
 
 const STORAGE_KEY = 'smb-media-quality';
 
-export function useQualityPreference(): {
+interface QualityPreferenceValue {
   quality: QualityTier;
   setQuality: (quality: QualityTier) => void;
   profiles: QualityProfile[];
-} {
+}
+
+const QualityPreferenceContext = createContext<QualityPreferenceValue | null>(null);
+
+export function QualityPreferenceProvider({ children }: { children: ReactNode }) {
   const [profiles, setProfiles] = useState<QualityProfile[]>([]);
   const [quality, setQualityState] = useState<QualityTier>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -21,12 +33,29 @@ export function useQualityPreference(): {
       .catch(() => undefined);
   }, []);
 
-  function setQuality(next: QualityTier) {
+  const setQuality = useCallback((next: QualityTier) => {
     setQualityState(next);
     localStorage.setItem(STORAGE_KEY, next);
-  }
+  }, []);
 
-  return { quality, setQuality, profiles };
+  const value = useMemo(
+    () => ({ quality, setQuality, profiles }),
+    [quality, setQuality, profiles],
+  );
+
+  return (
+    <QualityPreferenceContext.Provider value={value}>
+      {children}
+    </QualityPreferenceContext.Provider>
+  );
+}
+
+export function useQualityPreference(): QualityPreferenceValue {
+  const value = useContext(QualityPreferenceContext);
+  if (!value) {
+    throw new Error('useQualityPreference must be used within QualityPreferenceProvider');
+  }
+  return value;
 }
 
 interface ResolutionSelectorProps {

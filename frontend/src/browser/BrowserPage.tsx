@@ -44,6 +44,12 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
     navigate(browsePathToUrl(path));
   }
 
+  function handleSortChange(next: typeof sort) {
+    setSort(next);
+    // New order is easiest to read from the top; also forces the first rows to load.
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
   useEffect(() => {
     setIndexBannerDismissed(false);
     setIndexingActive(false);
@@ -79,6 +85,12 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   const sortedEntries = useMemo(
     () => sortEntries(entries, sort),
     [entries, sort],
+  );
+
+  // Changes when sort mode OR EXIF-driven reordering changes which cards sit where.
+  const gridLayoutKey = useMemo(
+    () => sortedEntries.map((entry) => entry.path).join('\n'),
+    [sortedEntries],
   );
 
   const needsIndexRefresh = useMemo(
@@ -217,7 +229,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
           <p className="subtitle">Signed in as {username}</p>
         </div>
         <div className="top-actions">
-          <SortSelector sort={sort} onChange={setSort} />
+          <SortSelector sort={sort} onChange={handleSortChange} />
           <GridDetailsToggle
             enabled={showGridDetails}
             onChange={setShowGridDetails}
@@ -284,13 +296,17 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
                     </div>
                   ) : entry.token && entry.type === 'image' ? (
                     <LazyThumbnail
+                      key={`${entry.path}:${sort}`}
                       src={entry.thumbnailUrl ?? mediaUrl(entry.token, 'image', 'very_low')}
                       alt={entry.name}
+                      layoutKey={gridLayoutKey}
                     />
                   ) : entry.token && entry.type === 'video' ? (
                     <LazyThumbnail
+                      key={`${entry.path}:${sort}`}
                       src={entry.thumbnailUrl ?? mediaUrl(entry.token, 'poster')}
                       alt={entry.name}
+                      layoutKey={gridLayoutKey}
                     />
                   ) : (
                     <div className="placeholder" />
