@@ -1,7 +1,8 @@
 node_modules/
 dist/
-cache/
-index/
+# Runtime data dirs (not backend/src/cache or backend/src/index source)
+backend/cache/
+backend/index/
 .env
 *.log
 .DS_Store
