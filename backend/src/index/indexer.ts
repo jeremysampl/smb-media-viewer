@@ -23,16 +23,105 @@ const inFlight = new Map<string, Promise<{ filePath: string; contentType: string
 let activeWorkers = 0;
 
 function thumbKeyFor(sourcePath: string, mtimeMs: number, kind: string): string {
+  // color-v6: HDR via libplacebo (or CPU tonemap+vibrance); SDR limited→full + light eq
   return crypto
     .createHash('sha1')
-    .update(`index|${sourcePath}|${mtimeMs}|${kind}`)
+    .update(`index|${sourcePath}|${mtimeMs}|${kind}|color-v6`)
     .digest('hex');
 }
 
-function extractPosterJpeg(
+const HDR_TRANSFERS = new Set([
+  'smpte2084',
+  'arib-std-b67',
+  'smpte428',
+]);
+
+type PosterPipeline = 'libplacebo' | 'cpu-hdr' | 'sdr';
+
+function probeVideoTransfer(sourcePath: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const child = spawn(
+      'ffprobe',
+      [
+        '-v',
+        'quiet',
+        '-select_streams',
+        'v:0',
+        '-show_entries',
+        'stream=color_transfer',
+        '-of',
+        'default=nw=1:nk=1',
+        sourcePath,
+      ],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+
+    let stdout = '';
+    child.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.on('error', () => resolve(null));
+    child.on('close', () => {
+      const transfer = stdout.trim().toLowerCase();
+      resolve(transfer || null);
+    });
+  });
+}
+
+function posterVf(
+  maxDim: number,
+  pipeline: PosterPipeline,
+  transfer: string | null,
+): string {
+  const scale = `scale=w=${maxDim}:h=${maxDim}:force_original_aspect_ratio=decrease:flags=lanczos`;
+
+  if (pipeline === 'libplacebo') {
+    // Best perceptual HDR→SDR (needs Vulkan). Spline + mild vibrance recovers
+    // contrast/chroma without the flat milky look of basic tonemap.
+    const placebo = [
+      `libplacebo=w=${maxDim}:h=${maxDim}:force_original_aspect_ratio=decrease`,
+      'colorspace=bt709',
+      'color_primaries=bt709',
+      'color_trc=bt709',
+      'range=pc',
+      'tonemapping=spline',
+      'gamut_mode=perceptual',
+      'contrast_recovery=0.6',
+      'format=gbrp',
+    ].join(':');
+    return [placebo, 'vibrance=intensity=0.45', 'eq=contrast=1.1', 'format=rgb24'].join(
+      ',',
+    );
+  }
+
+  if (pipeline === 'cpu-hdr') {
+    const tin = transfer === 'arib-std-b67' ? 'arib-std-b67' : 'smpte2084';
+    return [
+      `zscale=tin=${tin}:min=bt2020nc:pin=bt2020:t=linear:npl=100`,
+      'format=gbrpf32le',
+      'zscale=p=bt709:t=bt709:m=bt709:r=pc',
+      'tonemap=mobius:desat=0',
+      'eq=contrast=1.28:gamma=0.9',
+      'vibrance=intensity=0.35',
+      'format=rgb24',
+      scale,
+    ].join(',');
+  }
+
+  // SDR: expand limited-range YUV so stills aren't gray/washed-out.
+  return [
+    `${scale}:in_range=auto:out_range=pc`,
+    'eq=saturation=1.18:contrast=1.05',
+    'format=rgb24',
+  ].join(',');
+}
+
+function extractPosterFrame(
   sourcePath: string,
   seekSeconds: string,
   maxDim: number,
+  pipeline: PosterPipeline,
+  transfer: string | null,
 ): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -49,11 +138,11 @@ function extractPosterJpeg(
         '-frames:v',
         '1',
         '-vf',
-        `scale=w=${maxDim}:h=${maxDim}:force_original_aspect_ratio=decrease`,
+        posterVf(maxDim, pipeline, transfer),
         '-f',
         'image2pipe',
         '-vcodec',
-        'mjpeg',
+        'png',
         'pipe:1',
       ],
       { stdio: ['ignore', 'pipe', 'pipe'] },
@@ -111,20 +200,34 @@ async function generateVideoPoster(
 ): Promise<void> {
   const maxDim = getQualityProfile('very_low').imageMaxDimension ?? 320;
   await fs.mkdir(path.dirname(thumbPath), { recursive: true });
+  const transfer = await probeVideoTransfer(sourcePath);
+  const hdr = transfer !== null && HDR_TRANSFERS.has(transfer);
+
+  // Prefer libplacebo for HDR; fall back to CPU tonemap; then SDR.
+  const pipelines: PosterPipeline[] = hdr
+    ? ['libplacebo', 'cpu-hdr', 'sdr']
+    : ['sdr'];
 
   let lastError: unknown;
-  // Prefer ~1s in; fall back to the first frame for short / hard-to-seek clips.
-  for (const seek of ['1', '0']) {
-    try {
-      const jpeg = await extractPosterJpeg(sourcePath, seek, maxDim);
-      const buffer = await sharp(jpeg, { failOn: 'none' })
-        .rotate()
-        .webp({ quality: 70 })
-        .toBuffer();
-      await writeAtomic(thumbPath, buffer);
-      return;
-    } catch (error) {
-      lastError = error;
+  for (const pipeline of pipelines) {
+    for (const seek of ['1', '0']) {
+      try {
+        const frame = await extractPosterFrame(
+          sourcePath,
+          seek,
+          maxDim,
+          pipeline,
+          transfer,
+        );
+        const buffer = await sharp(frame, { failOn: 'none' })
+          .rotate()
+          .webp({ quality: 78 })
+          .toBuffer();
+        await writeAtomic(thumbPath, buffer);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
     }
   }
 

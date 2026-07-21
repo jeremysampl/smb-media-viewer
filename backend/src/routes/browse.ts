@@ -153,7 +153,7 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
       token,
       thumbnailUrl: isImage
         ? `/api/media/${token}/image?quality=very_low`
-        : `/api/media/${token}/poster?v=3`,
+        : `/api/media/${token}/poster?v=6`,
     });
   }
 
