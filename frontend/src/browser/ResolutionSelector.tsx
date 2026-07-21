@@ -72,9 +72,14 @@ export function ResolutionSelector({
   compact = false,
 }: ResolutionSelectorProps) {
   return (
-    <label className={`resolution-selector ${compact ? 'compact' : ''}`}>
-      <span>Quality</span>
-      <select value={quality} onChange={(event) => onChange(event.target.value as QualityTier)}>
+    <label className={`toolbar-control${compact ? ' compact' : ''}`}>
+      <span className="toolbar-control-label">Quality</span>
+      <select
+        className="toolbar-control-select"
+        value={quality}
+        onChange={(event) => onChange(event.target.value as QualityTier)}
+        aria-label="Quality"
+      >
         {profiles.map((profile) => (
           <option key={profile.id} value={profile.id}>
             {profile.label}

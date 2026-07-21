@@ -27,9 +27,14 @@ interface SortSelectorProps {
 
 export function SortSelector({ sort, onChange }: SortSelectorProps) {
   return (
-    <label className="sort-selector">
-      <span>Sort</span>
-      <select value={sort} onChange={(event) => onChange(event.target.value as SortMethod)}>
+    <label className="toolbar-control">
+      <span className="toolbar-control-label">Sort</span>
+      <select
+        className="toolbar-control-select"
+        value={sort}
+        onChange={(event) => onChange(event.target.value as SortMethod)}
+        aria-label="Sort"
+      >
         {SORT_OPTIONS.map((option) => (
           <option key={option.id} value={option.id}>
             {option.label}

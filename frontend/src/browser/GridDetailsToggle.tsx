@@ -33,17 +33,19 @@ interface GridDetailsToggleProps {
 
 export function GridDetailsToggle({ enabled, onChange }: GridDetailsToggleProps) {
   return (
-    <label className="slider-toggle">
-      <span className="slider-toggle-label">Details</span>
-      <input
-        type="checkbox"
-        className="slider-toggle-input"
-        checked={enabled}
-        onChange={(event) => onChange(event.target.checked)}
-        aria-label="Show file details in grid"
-      />
-      <span className="slider-toggle-track" aria-hidden>
-        <span className="slider-toggle-thumb" />
+    <label className="toolbar-control toolbar-toggle">
+      <span className="toolbar-control-label">Details</span>
+      <span className="slider-toggle">
+        <input
+          type="checkbox"
+          className="slider-toggle-input"
+          checked={enabled}
+          onChange={(event) => onChange(event.target.checked)}
+          aria-label="Show file details in grid"
+        />
+        <span className="slider-toggle-track" aria-hidden>
+          <span className="slider-toggle-thumb" />
+        </span>
       </span>
     </label>
   );

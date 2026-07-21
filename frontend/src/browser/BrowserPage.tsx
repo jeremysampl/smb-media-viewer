@@ -12,6 +12,7 @@ import { SortSelector, useSortPreference } from './SortSelector';
 import { GridDetailsToggle, useGridDetailsPreference } from './GridDetailsToggle';
 import { DownloadDialog } from './DownloadDialog';
 import { EntryContextMenu, type ContextMenuState } from './EntryContextMenu';
+import { UserMenu } from './UserMenu';
 import { formatDuration, formatEntryMeta } from './formatters';
 import { sortEntries } from './sortEntries';
 import {
@@ -375,11 +376,15 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
       }`}
     >
       <header className="top-bar">
-        <div>
+        <div className="top-bar-brand">
           <h1>Media Library</h1>
-          <p className="subtitle">Signed in as {username}</p>
         </div>
-        <div className="top-actions">
+        <UserMenu username={username} onLogout={onLogout} />
+      </header>
+
+      <div className="browser-nav-row">
+        <Breadcrumbs path={currentPath} onNavigate={navigateToPath} />
+        <div className="toolbar-group" role="group" aria-label="Library controls">
           <SortSelector sort={sort} onChange={handleSortChange} />
           <GridDetailsToggle
             enabled={showGridDetails}
@@ -390,13 +395,8 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
             profiles={profiles}
             onChange={setQuality}
           />
-          <button type="button" className="secondary" onClick={() => void onLogout()}>
-            Sign out
-          </button>
         </div>
-      </header>
-
-      <Breadcrumbs path={currentPath} onNavigate={navigateToPath} />
+      </div>
 
       {loading ? <p className="status">Loading...</p> : null}
       {error ? <p className="error">{error}</p> : null}
