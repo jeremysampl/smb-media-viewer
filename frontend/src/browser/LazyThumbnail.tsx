@@ -116,7 +116,9 @@ export function LazyThumbnail({
           key={`${src}:${retryKey}`}
           src={src}
           alt={alt}
+          draggable={false}
           decoding="async"
+          onDragStart={(event) => event.preventDefault()}
           onLoad={() => setLoaded(true)}
           onError={() => {
             if (retryCountRef.current >= MAX_RETRIES) {

@@ -8,6 +8,8 @@ export type QualityTier =
 
 export type MediaType = 'image' | 'video';
 
+export type EntryType = 'folder' | MediaType | 'file';
+
 export interface QualityProfile {
   id: QualityTier;
   label: string;
@@ -18,7 +20,7 @@ export interface QualityProfile {
 export interface BrowseEntry {
   name: string;
   path: string;
-  type: 'folder' | MediaType;
+  type: EntryType;
   size?: number;
   mtime?: string;
   captureTime?: string;

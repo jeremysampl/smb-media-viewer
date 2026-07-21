@@ -13,6 +13,7 @@ const TYPE_ORDER: Record<BrowseEntry['type'], number> = {
   folder: 0,
   image: 1,
   video: 2,
+  file: 3,
 };
 
 function compareName(a: BrowseEntry, b: BrowseEntry): number {

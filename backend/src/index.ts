@@ -6,6 +6,7 @@ import { config } from './config.js';
 import authRoutes from './auth/routes.js';
 import browseRoutes from './routes/browse.js';
 import mediaRoutes from './routes/media.js';
+import downloadRoutes from './routes/download.js';
 import { startCacheCleanupJob } from './cache/cleanup.js';
 import { getIndexDb } from './index/db.js';
 import { QUALITY_PROFILES } from './media/quality.js';
@@ -18,7 +19,7 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 app.get('/api/health', (_req, res) => {
@@ -32,6 +33,7 @@ app.get('/api/quality', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api', browseRoutes);
 app.use('/api/media', mediaRoutes);
+app.use('/api/download', downloadRoutes);
 
 app.use((error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(error);

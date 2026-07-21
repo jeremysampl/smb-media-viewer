@@ -62,3 +62,40 @@ export function mediaUrl(
 export async function getMediaMetadata(token: string): Promise<MediaMetadata> {
   return request(`/media/${token}/metadata`);
 }
+
+export async function downloadZip(options: {
+  paths: string[];
+  zipName: string;
+  quality: string;
+}): Promise<void> {
+  const response = await fetch(`${API_BASE}/download/zip`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(options),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const message = (body as { error?: string }).error ?? response.statusText;
+    throw new Error(message || 'Download failed');
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const utfMatch = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  const plainMatch = /filename="?([^";]+)"?/i.exec(disposition);
+  const filename = decodeURIComponent(
+    utfMatch?.[1] ?? plainMatch?.[1] ?? `${options.zipName || 'download'}.zip`,
+  );
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+

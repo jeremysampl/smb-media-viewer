@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { browse, mediaUrl } from '../api/client';
-import type { BrowseEntry } from '../types';
+import { browse, downloadZip, mediaUrl } from '../api/client';
+import type { BrowseEntry, QualityTier } from '../types';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { Breadcrumbs } from './Breadcrumbs';
 import { browsePathToUrl, urlSplatToBrowsePath } from './browsePath';
@@ -10,6 +10,8 @@ import { LazyThumbnail } from './LazyThumbnail';
 import { ResolutionSelector, useQualityPreference } from './ResolutionSelector';
 import { SortSelector, useSortPreference } from './SortSelector';
 import { GridDetailsToggle, useGridDetailsPreference } from './GridDetailsToggle';
+import { DownloadDialog } from './DownloadDialog';
+import { EntryContextMenu, type ContextMenuState } from './EntryContextMenu';
 import { formatDuration, formatEntryMeta } from './formatters';
 import { sortEntries } from './sortEntries';
 import {
@@ -21,6 +23,14 @@ import {
 interface BrowserPageProps {
   onLogout: () => Promise<void>;
   username: string;
+}
+
+const LONG_PRESS_MS = 480;
+const LONG_PRESS_MOVE_PX = 12;
+
+function defaultZipNameForPath(browsePath: string): string {
+  const segments = browsePath.split('/').filter(Boolean);
+  return segments.at(-1) || 'Shares';
 }
 
 export function BrowserPage({ onLogout, username }: BrowserPageProps) {
@@ -39,6 +49,19 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   const { showGridDetails, setShowGridDetails } = useGridDetailsPreference();
   const [indexBannerDismissed, setIndexBannerDismissed] = useState(false);
   const [indexingActive, setIndexingActive] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
+  const [downloadTargets, setDownloadTargets] = useState<string[]>([]);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressPathRef = useRef<string | null>(null);
+  /** Only ignore the click that belongs to the long-pressed card, not the next tap. */
+  const suppressClickPathRef = useRef<string | null>(null);
 
   function navigateToPath(path: string) {
     navigate(browsePathToUrl(path));
@@ -46,14 +69,68 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
 
   function handleSortChange(next: typeof sort) {
     setSort(next);
-    // New order is easiest to read from the top; also forces the first rows to load.
     window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  function clearLongPress() {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressOriginRef.current = null;
+    longPressPathRef.current = null;
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedPaths(new Set());
+    setDownloadOpen(false);
+    setDownloadError('');
+    setDownloadTargets([]);
+    setContextMenu(null);
+  }
+
+  function beginSelectionWith(path: string) {
+    setSelectMode(true);
+    setSelectedPaths(new Set([path]));
+    setContextMenu(null);
+  }
+
+  function toggleSelected(path: string) {
+    setSelectedPaths((previous) => {
+      const next = new Set(previous);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }
+
+  function selectAllVisible() {
+    setSelectedPaths(new Set(sortedEntries.map((entry) => entry.path)));
+  }
+
+  function openDownload(paths: string[]) {
+    if (paths.length === 0) return;
+    setDownloadTargets(paths);
+    setDownloadError('');
+    setDownloadOpen(true);
+    setContextMenu(null);
   }
 
   useEffect(() => {
     setIndexBannerDismissed(false);
     setIndexingActive(false);
+    exitSelectMode();
   }, [currentPath]);
+
+  useEffect(() => {
+    if (!selectMode) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') exitSelectMode();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectMode]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -87,7 +164,6 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
     [entries, sort],
   );
 
-  // Changes when sort mode OR EXIF-driven reordering changes which cards sit where.
   const gridLayoutKey = useMemo(
     () => sortedEntries.map((entry) => entry.path).join('\n'),
     [sortedEntries],
@@ -102,8 +178,10 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
     [entries],
   );
 
-  // Soft-refresh while background indexing fills in captureTime / duration.
-  // Keep existing tokens so thumbnail <img> src values do not change (avoids RAM spikes).
+  const allVisibleSelected =
+    sortedEntries.length > 0 &&
+    sortedEntries.every((entry) => selectedPaths.has(entry.path));
+
   useEffect(() => {
     if (loading || error || !needsIndexRefresh) {
       setIndexingActive(false);
@@ -155,9 +233,6 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
               if (!prior.captureTime && nextCapture) filled += 1;
               changed = true;
 
-              // Capture-time arriving usually means the index thumb/poster is ready.
-              // Bust the thumbnail URL once so LazyThumbnail remounts without
-              // swapping the media token (which would reload every grid image).
               const thumbnailUrl =
                 !prior.captureTime && nextCapture && prior.thumbnailUrl
                   ? `${prior.thumbnailUrl}${prior.thumbnailUrl.includes('?') ? '&' : '?'}v=1`
@@ -193,13 +268,12 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
     };
   }, [currentPath, loading, error, needsIndexRefresh]);
 
-  function openEntry(entry: BrowseEntry) {
-    if (shouldSuppressClick()) return;
-
+  function viewEntry(entry: BrowseEntry) {
     if (entry.type === 'folder') {
       navigateToPath(entry.path);
       return;
     }
+    if (entry.type === 'file') return;
 
     const mediaEntries = sortedEntries.filter(
       (item) => item.type === 'image' || item.type === 'video',
@@ -207,6 +281,79 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
     const index = mediaEntries.findIndex((item) => item.path === entry.path);
     setGalleryIndex(index >= 0 ? index : 0);
     setGalleryOpen(true);
+  }
+
+  function openEntry(entry: BrowseEntry) {
+    if (shouldSuppressClick()) return;
+
+    // After a long-press, browsers may or may not emit a click on that same card.
+    // Only suppress that card's click — never the next tap on another item.
+    if (suppressClickPathRef.current) {
+      const suppressedPath = suppressClickPathRef.current;
+      suppressClickPathRef.current = null;
+      if (suppressedPath === entry.path) return;
+    }
+
+    if (selectMode) {
+      toggleSelected(entry.path);
+      return;
+    }
+
+    viewEntry(entry);
+  }
+
+  function handleCardPointerDown(entry: BrowseEntry, event: React.PointerEvent) {
+    if (!isMobile || selectMode) return;
+    if (event.pointerType === 'mouse') return;
+    if (event.isPrimary === false) return;
+
+    clearLongPress();
+    longPressOriginRef.current = { x: event.clientX, y: event.clientY };
+    longPressPathRef.current = entry.path;
+    longPressTimerRef.current = window.setTimeout(() => {
+      const path = longPressPathRef.current;
+      clearLongPress();
+      if (!path) return;
+      suppressClickPathRef.current = path;
+      beginSelectionWith(path);
+      navigator.vibrate?.(15);
+    }, LONG_PRESS_MS);
+  }
+
+  function handleCardPointerMove(event: React.PointerEvent) {
+    const origin = longPressOriginRef.current;
+    if (!origin) return;
+    const dx = event.clientX - origin.x;
+    const dy = event.clientY - origin.y;
+    if (dx * dx + dy * dy > LONG_PRESS_MOVE_PX * LONG_PRESS_MOVE_PX) {
+      clearLongPress();
+    }
+  }
+
+  function handleCardContextMenu(entry: BrowseEntry, event: React.MouseEvent) {
+    event.preventDefault();
+    if (isMobile) return;
+    event.stopPropagation();
+    setContextMenu({ x: event.clientX, y: event.clientY, entry });
+  }
+
+  async function handleDownloadConfirm(zipName: string, downloadQuality: QualityTier) {
+    setDownloadBusy(true);
+    setDownloadError('');
+    try {
+      await downloadZip({
+        paths: downloadTargets,
+        zipName,
+        quality: downloadQuality,
+      });
+      setDownloadOpen(false);
+      setDownloadTargets([]);
+      if (selectMode) exitSelectMode();
+    } catch (err) {
+      setDownloadError(err instanceof Error ? err.message : 'Download failed');
+    } finally {
+      setDownloadBusy(false);
+    }
   }
 
   const gridStyle = isMobile
@@ -220,9 +367,14 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   const denseGrid = isMobile && columns >= 4;
   const showIndexBanner =
     !loading && !error && indexingActive && !indexBannerDismissed;
+  const showSelectionChrome = selectMode;
 
   return (
-    <div className="browser-page">
+    <div
+      className={`browser-page${selectMode ? ' selecting' : ''}${
+        showSelectionChrome ? ' has-selection-dock' : ''
+      }`}
+    >
       <header className="top-bar">
         <div>
           <h1>Media Library</h1>
@@ -277,7 +429,12 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
         >
           {sortedEntries.map((entry) => {
             const isMedia = entry.type === 'image' || entry.type === 'video';
-            const showMeta = (!isMedia || showGridDetails) && !denseGrid;
+            const showMeta =
+              (entry.type === 'folder' ||
+                entry.type === 'file' ||
+                showGridDetails) &&
+              !denseGrid;
+            const selected = selectedPaths.has(entry.path);
 
             return (
               <button
@@ -285,14 +442,32 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
                 type="button"
                 className={`file-card ${entry.type}${
                   isMedia && (!showGridDetails || denseGrid) ? ' compact' : ''
-                }`}
+                }${selected ? ' is-selected' : ''}`}
                 data-media-path={isMedia ? entry.path : undefined}
+                aria-pressed={selectMode ? selected : undefined}
                 onClick={() => openEntry(entry)}
+                onContextMenu={(event) => handleCardContextMenu(entry, event)}
+                onDragStart={(event) => event.preventDefault()}
+                draggable={false}
+                onPointerDown={(event) => handleCardPointerDown(entry, event)}
+                onPointerMove={handleCardPointerMove}
+                onPointerUp={clearLongPress}
+                onPointerCancel={clearLongPress}
+                onPointerLeave={clearLongPress}
               >
+                {selectMode ? (
+                  <span className={`selection-check${selected ? ' checked' : ''}`} aria-hidden>
+                    {selected ? '✓' : ''}
+                  </span>
+                ) : null}
                 <div className="thumb-wrap">
                   {entry.type === 'folder' ? (
                     <div className="folder-icon" aria-hidden>
                       📁
+                    </div>
+                  ) : entry.type === 'file' ? (
+                    <div className="file-icon" aria-hidden>
+                      📄
                     </div>
                   ) : entry.token && entry.type === 'image' ? (
                     <LazyThumbnail
@@ -318,7 +493,9 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
                 {showMeta ? (
                   <div className="meta">
                     <span className="name">{entry.name}</span>
-                    {isMedia && showGridDetails && (entry.size || entry.format) ? (
+                    {(isMedia || entry.type === 'file') &&
+                    showGridDetails &&
+                    (entry.size || entry.format) ? (
                       <span className="size">{formatEntryMeta(entry)}</span>
                     ) : null}
                   </div>
@@ -329,11 +506,108 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
         </div>
       ) : null}
 
+      {showSelectionChrome ? (
+        <>
+          <div className="selection-chip selection-chip-start" role="status">
+            <span className="selection-chip-count">{selectedPaths.size}</span>
+            <button
+              type="button"
+              className={`selection-chip-icon-btn${allVisibleSelected ? ' is-active' : ''}`}
+              aria-label={allVisibleSelected ? 'Clear selection' : 'Select all'}
+              aria-pressed={allVisibleSelected}
+              disabled={sortedEntries.length === 0}
+              onClick={() => {
+                if (allVisibleSelected) setSelectedPaths(new Set());
+                else selectAllVisible();
+              }}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M7 5h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm0 2v12h12V7H7Zm2.3 6.3 1.4-1.4 1.8 1.8 4.2-4.2 1.4 1.4-5.6 5.6-3.2-3.2Z"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="selection-chip selection-chip-end"
+            aria-label="Cancel selection"
+            onClick={exitSelectMode}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6 6.4 5Z"
+              />
+            </svg>
+          </button>
+
+          <div className="selection-dock" role="region" aria-label="Selection actions">
+            <button
+              type="button"
+              className="selection-dock-action"
+              disabled={selectedPaths.size === 0}
+              onClick={() => openDownload([...selectedPaths])}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M11 3h2v10.2l3.1-3.1 1.4 1.4L12 17.1 6.5 11.5l1.4-1.4L11 13.2V3Zm-6 14h14v4H5v-4Z"
+                />
+              </svg>
+              <span>Download</span>
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {contextMenu && !isMobile ? (
+        <EntryContextMenu
+          menu={contextMenu}
+          selectMode={selectMode}
+          selected={selectedPaths.has(contextMenu.entry.path)}
+          selectedCount={selectedPaths.size}
+          onClose={() => setContextMenu(null)}
+          onSelect={() => {
+            if (selectMode) toggleSelected(contextMenu.entry.path);
+            else beginSelectionWith(contextMenu.entry.path);
+          }}
+          onDeselect={() => toggleSelected(contextMenu.entry.path)}
+          onSelectAll={selectAllVisible}
+          onClearSelection={exitSelectMode}
+          onView={() => viewEntry(contextMenu.entry)}
+          onDownloadOne={() => openDownload([contextMenu.entry.path])}
+          onDownloadSelected={() => openDownload([...selectedPaths])}
+        />
+      ) : null}
+
       <MediaGallery
         entries={sortedEntries}
         initialIndex={galleryIndex}
         open={galleryOpen}
         onClose={() => setGalleryOpen(false)}
+      />
+
+      <DownloadDialog
+        open={downloadOpen}
+        defaultZipName={defaultZipNameForPath(currentPath)}
+        selectedCount={downloadTargets.length}
+        quality={quality === 'very_low' ? 'medium' : quality}
+        profiles={profiles}
+        busy={downloadBusy}
+        error={downloadError}
+        onClose={() => {
+          if (!downloadBusy) {
+            setDownloadOpen(false);
+            setDownloadError('');
+            setDownloadTargets([]);
+          }
+        }}
+        onConfirm={(zipName, downloadQuality) => {
+          void handleDownloadConfirm(zipName, downloadQuality);
+        }}
       />
     </div>
   );

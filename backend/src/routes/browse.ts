@@ -55,6 +55,11 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
     entryBrowsePath: string;
     absoluteEntryPath: string;
   }> = [];
+  const otherCandidates: Array<{
+    name: string;
+    entryBrowsePath: string;
+    absoluteEntryPath: string;
+  }> = [];
 
   for (const entry of dirEntries) {
     if (entry.name.startsWith('.')) continue;
@@ -73,16 +78,25 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
       continue;
     }
 
-    if (!entry.isFile() || !isMediaFile(entry.name)) continue;
+    if (!entry.isFile()) continue;
 
-    mediaCandidates.push({
+    if (isMediaFile(entry.name)) {
+      mediaCandidates.push({
+        name: entry.name,
+        entryBrowsePath,
+        absoluteEntryPath,
+      });
+      continue;
+    }
+
+    otherCandidates.push({
       name: entry.name,
       entryBrowsePath,
       absoluteEntryPath,
     });
   }
 
-  const stated = await mapWithConcurrency(
+  const statedMedia = await mapWithConcurrency(
     mediaCandidates,
     STAT_CONCURRENCY,
     async (job) => {
@@ -92,7 +106,7 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
     },
   );
 
-  const mediaFiles = stated.filter(
+  const mediaFiles = statedMedia.filter(
     (item): item is NonNullable<typeof item> => item !== null,
   );
 
@@ -139,7 +153,29 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
       token,
       thumbnailUrl: isImage
         ? `/api/media/${token}/image?quality=very_low`
-        : `/api/media/${token}/poster`,
+        : `/api/media/${token}/poster?v=3`,
+    });
+  }
+
+  const statedOther = await mapWithConcurrency(
+    otherCandidates,
+    STAT_CONCURRENCY,
+    async (job) => {
+      const stats = await fs.stat(job.absoluteEntryPath).catch(() => null);
+      if (!stats) return null;
+      return { ...job, stats };
+    },
+  );
+
+  for (const file of statedOther) {
+    if (!file) continue;
+    entries.push({
+      name: file.name,
+      path: file.entryBrowsePath,
+      type: 'file',
+      size: file.stats.size,
+      mtime: file.stats.mtime.toISOString(),
+      format: getFormatLabel(file.name),
     });
   }
 

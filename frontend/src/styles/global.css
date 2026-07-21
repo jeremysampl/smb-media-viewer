@@ -320,6 +320,7 @@ button:disabled {
   box-sizing: border-box;
   padding: var(--card-padding, 0.75rem);
   min-width: 0;
+  touch-action: manipulation;
   transition:
     border-radius 380ms cubic-bezier(0.33, 1, 0.68, 1),
     gap 380ms cubic-bezier(0.33, 1, 0.68, 1);
@@ -349,6 +350,7 @@ button:disabled {
 }
 
 .file-card {
+  position: relative;
   display: grid;
   gap: 0.65rem;
   padding: 0.75rem;
@@ -359,6 +361,15 @@ button:disabled {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
+}
+
+.file-card:focus {
+  outline: none;
+}
+
+.file-card:focus-visible {
+  outline: 2px solid rgba(142, 181, 255, 0.85);
+  outline-offset: 2px;
 }
 
 .file-card:hover {
@@ -429,6 +440,257 @@ button:disabled {
   height: 100%;
   font-size: clamp(2.5rem, 42%, 4rem);
   line-height: 1;
+}
+
+.file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: clamp(2.2rem, 38%, 3.5rem);
+  line-height: 1;
+  opacity: 0.92;
+}
+
+.selection-dock {
+  position: fixed;
+  left: 50%;
+  bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  padding: 0.35rem;
+  border-radius: 18px;
+  background: rgba(18, 26, 38, 0.96);
+  border: 1px solid rgba(126, 164, 255, 0.3);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+  backdrop-filter: blur(10px);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.selection-dock-action {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  min-width: 4.6rem;
+  padding: 0.55rem 0.85rem 0.45rem;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.selection-dock-action:focus,
+.selection-dock-action:focus-visible {
+  outline: none;
+}
+
+.selection-dock-action svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.selection-dock-action:disabled {
+  opacity: 0.45;
+}
+
+.selection-chip {
+  position: fixed;
+  z-index: 9500;
+  top: calc(0.85rem + env(safe-area-inset-top, 0px));
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2.55rem;
+  padding: 0.3rem;
+  border-radius: 999px;
+  background: rgba(18, 26, 38, 0.96);
+  border: 1px solid rgba(126, 164, 255, 0.3);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.selection-chip-start {
+  left: 0.75rem;
+  padding-left: 0.75rem;
+}
+
+.selection-chip-end {
+  right: 0.75rem;
+  left: auto;
+  width: 2.55rem;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(126, 164, 255, 0.3);
+  color: inherit;
+  outline: none;
+}
+
+.selection-chip-count {
+  min-width: 1.1rem;
+  color: #e8edf5;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.selection-chip-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.selection-chip-icon-btn:focus,
+.selection-chip-icon-btn:focus-visible,
+.selection-chip-end:focus,
+.selection-chip-end:focus-visible {
+  outline: none;
+}
+
+.selection-chip-icon-btn svg,
+.selection-chip-end svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  pointer-events: none;
+}
+
+.selection-chip-icon-btn.is-active {
+  background: rgba(61, 123, 255, 0.35);
+  color: #dce8ff;
+}
+
+.browser-page.has-selection-dock {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.browser-page.has-selection-dock .index-snackbar {
+  bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.file-card .thumb-wrap,
+.file-card .thumb-wrap * {
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
+.file-card.is-selected {
+  border-color: rgba(126, 164, 255, 0.75);
+  box-shadow: 0 0 0 1px rgba(126, 164, 255, 0.35);
+}
+
+.selection-check {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.55rem;
+  z-index: 2;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: rgba(10, 14, 20, 0.55);
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  pointer-events: none;
+}
+
+.selection-check.checked {
+  background: #3d7bff;
+  border-color: #3d7bff;
+}
+
+.entry-context-menu {
+  position: fixed;
+  z-index: 12000;
+  min-width: 11.5rem;
+  padding: 0.35rem;
+  border-radius: 12px;
+  background: rgba(18, 26, 38, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  display: grid;
+  gap: 0.15rem;
+}
+
+.entry-context-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  padding: 0.55rem 0.7rem;
+  font-weight: 500;
+}
+
+.entry-context-menu button:hover:not(:disabled) {
+  background: rgba(61, 123, 255, 0.22);
+}
+
+.entry-context-menu button:disabled {
+  opacity: 0.45;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(6, 10, 16, 0.72);
+}
+
+.modal-card {
+  width: min(28rem, 100%);
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.35rem 1.4rem 1.25rem;
+  border-radius: 16px;
+  background: rgba(18, 26, 38, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.modal-card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
 }
 
 .badge {
