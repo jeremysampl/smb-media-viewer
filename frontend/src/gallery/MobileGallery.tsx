@@ -5,7 +5,14 @@ import type { BrowseEntry, QualityTier } from '../types';
 import { useQualityPreference } from '../browser/ResolutionSelector';
 import { MediaDetailsPanel } from './MediaDetailsPanel';
 import { MobileGalleryVideoSlide } from './MobileGalleryVideoSlide';
-import { getThumbnailRect, rectFromDomRect, type FlyoutRect } from './getThumbnailRect';
+import {
+  getThumbnailNaturalSize,
+  getThumbnailRect,
+  mediaContentRect,
+  objectFitContainRect,
+  rectFromDomRect,
+  type FlyoutRect,
+} from './getThumbnailRect';
 import {
   DEFAULT_IMAGE_ZOOM,
   ZOOM_SNAP_THRESHOLD,
@@ -132,12 +139,33 @@ function buildFlyoutLayer(
   return { kind: 'image', src, rect };
 }
 
-function stageFlyoutRect(stage: HTMLDivElement | null): FlyoutRect {
+function stageFlyoutRect(
+  stage: HTMLDivElement | null,
+  mediaPath?: string,
+): FlyoutRect {
   const rect = stage?.getBoundingClientRect();
   if (!rect || rect.width <= 0 || rect.height <= 0) {
     return viewportFlyoutRect();
   }
+  // Prefer the object-fit:contain paint box so open ends on the same framing
+  // the gallery uses (then cover on a matching-aspect frame is a no-op crop).
+  const natural = mediaPath ? getThumbnailNaturalSize(mediaPath) : null;
+  if (natural) {
+    return rectFromDomRect(
+      objectFitContainRect(rect, natural.width, natural.height),
+      0,
+    );
+  }
   return rectFromDomRect(rect, 0);
+}
+
+function activeMediaFlyoutRect(
+  stage: HTMLDivElement | null,
+  activeIndex: number,
+): DOMRect | null {
+  const media = getActiveMedia(stage, activeIndex);
+  if (!media) return null;
+  return mediaContentRect(media);
 }
 
 function getActiveImage(stage: HTMLDivElement | null, activeIndex: number) {
@@ -243,24 +271,24 @@ export function MobileGallery({
         return;
       }
 
-      const kind = entry.type === 'video' ? 'video' : 'image';
-      const src =
-        kind === 'video'
-          ? mediaUrl(entry.token, 'video', quality)
-          : mediaUrl(entry.token, 'image', quality);
-      const poster = kind === 'video' ? mediaUrl(entry.token, 'poster') : undefined;
+      // Same cached thumb/poster as open — avoid first-close jank from decoding
+      // a fresh full-quality <img>/<video> mid-animation.
+      const closingLayer = buildFlyoutLayer(
+        entry,
+        rectFromDomRect(fromRect, 0),
+        quality,
+      );
+      if (!closingLayer) {
+        onClose();
+        return;
+      }
 
       setIsClosing(true);
       setIsOpening(false);
       setIsDragging(false);
       setDragOffset({ x: 0, y: 0 });
       resetImageZoom();
-      setFlyout({
-        kind,
-        src,
-        poster,
-        rect: rectFromDomRect(fromRect, 0),
-      });
+      setFlyout(closingLayer);
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -285,7 +313,7 @@ export function MobileGallery({
   );
 
   const animateClose = useCallback(() => {
-    const mediaRect = getActiveMedia(stageRef.current, indexRef.current)?.getBoundingClientRect();
+    const mediaRect = activeMediaFlyoutRect(stageRef.current, indexRef.current);
     if (!mediaRect) {
       onClose();
       return;
@@ -355,7 +383,8 @@ export function MobileGallery({
       requestAnimationFrame(() => {
         // Don't measure the underlying <img> — it may still be unloaded (0×0)
         // which made the flyout animate toward a tiny rect (looked like zooming out).
-        const targetRect = stageFlyoutRect(stageRef.current);
+        // Target the contain paint box (via thumb natural size) so cover matches.
+        const targetRect = stageFlyoutRect(stageRef.current, entry.path);
         setFlyout((current) =>
           current ? { ...current, rect: targetRect } : null,
         );
@@ -604,7 +633,7 @@ export function MobileGallery({
       }
 
       if (state.axis === 'y' && state.offsetY > DISMISS_THRESHOLD) {
-        const mediaRect = getActiveMedia(stageRef.current, indexRef.current)?.getBoundingClientRect();
+        const mediaRect = activeMediaFlyoutRect(stageRef.current, indexRef.current);
         if (mediaRect) {
           runFlyoutClose(mediaRect);
         } else {
