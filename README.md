@@ -38,22 +38,22 @@ Configure both locations via env (`CACHE_DIR`, `INDEX_DIR`). In Docker Compose t
 - RAID/share paths available on the host (typically under `/srv/...`)
 - Ports available (default frontend `8080`, backend `3001` on host network)
 
-## Quick start on OMV
+## Quick start on OMV (pull images)
 
-1. Clone this repository on your NAS:
+No need to build from source. Pre-built images are published to GitHub Container Registry (GHCR) from this repo.
 
-```bash
-git clone https://github.com/your-user/smb-media-viewer.git
-cd smb-media-viewer
-```
-
-2. Create an environment file:
+1. Create a folder on the NAS and download Compose + env example:
 
 ```bash
-cp backend/.env.example .env
+mkdir -p smb-media-viewer && cd smb-media-viewer
+curl -fsSL -o docker-compose.yml \
+  https://raw.githubusercontent.com/jeremysampl/smb-media-viewer/main/docker-compose.yml
+curl -fsSL -o .env.example \
+  https://raw.githubusercontent.com/jeremysampl/smb-media-viewer/main/.env.example
+cp .env.example .env
 ```
 
-Edit `.env` and set strong values for `JWT_SECRET` and `TOKEN_SECRET`.
+2. Edit `.env` and set strong values for `JWT_SECRET` and `TOKEN_SECRET`. Set `FRONTEND_ORIGIN` to the URL you will open in the browser (e.g. `http://192.168.1.50:8080` or `https://media.example.com`).
 
 3. Update `docker-compose.yml` volume mounts if your share roots are not under `/srv`.
 
@@ -66,11 +66,14 @@ volumes:
 
 The `path =` value in each Samba share section of `smb.conf` must be reachable inside the backend container at the same absolute path.
 
-4. Build and start:
+4. Pull and start:
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
+
+Pin a release tag instead of `latest` by setting `IMAGE_TAG=1.0.0` (or similar) in `.env`.
 
 5. Open the app:
 
@@ -79,6 +82,33 @@ http://<your-nas-ip>:8080
 ```
 
 Sign in with a Samba user that already has access to one or more shares.
+
+### Build from source instead
+
+If you prefer to compile on the NAS (or GHCR packages are unavailable):
+
+```bash
+git clone https://github.com/jeremysampl/smb-media-viewer.git
+cd smb-media-viewer
+cp .env.example .env
+# edit .env secrets, then:
+docker compose up -d --build
+```
+
+### Publishing images (maintainers)
+
+Pushes to `main` and version tags (`v1.2.3`) run [.github/workflows/publish-images.yml](.github/workflows/publish-images.yml), which builds and pushes:
+
+- `ghcr.io/jeremysampl/smb-media-viewer-backend`
+- `ghcr.io/jeremysampl/smb-media-viewer-frontend`
+
+After the **first** successful workflow run, make the packages public (otherwise anonymous `docker pull` fails):
+
+1. Open the GitHub repo → **Packages** (right sidebar), or `https://github.com/users/jeremysampl/packages`
+2. Open each package → **Package settings** → **Change visibility** → **Public**
+3. Optionally create a GitHub **Release** / tag `v1.0.0` so users can pin `IMAGE_TAG=1.0.0`
+
+No extra secrets are required for GHCR from Actions in this repo (`GITHUB_TOKEN` is enough).
 
 ## Development
 

@@ -1,5 +1,11 @@
+# Pull pre-built images from GHCR (default), or build locally with:
+#   docker compose up -d --build
+#
+# Override tag via IMAGE_TAG in .env (e.g. 1.0.0 or latest).
+
 services:
   backend:
+    image: ghcr.io/jeremysampl/smb-media-viewer-backend:${IMAGE_TAG:-latest}
     build: ./backend
     container_name: smb-media-viewer-backend
     network_mode: host
@@ -24,6 +30,7 @@ services:
       - /srv:/srv:ro
 
   frontend:
+    image: ghcr.io/jeremysampl/smb-media-viewer-frontend:${IMAGE_TAG:-latest}
     build: ./frontend
     container_name: smb-media-viewer-frontend
     restart: unless-stopped
