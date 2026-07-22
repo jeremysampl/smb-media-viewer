@@ -4,4 +4,9 @@ declare module 'yet-another-react-lightbox' {
   interface Labels {
     Details?: string;
   }
+
+  interface SlideImage {
+    /** Browse entry path — stable across quality URL changes. */
+    entryPath?: string;
+  }
 }

@@ -1409,8 +1409,69 @@ button.breadcrumb-chip:focus-visible,
   -webkit-user-select: none;
   -webkit-user-drag: none;
   transform-origin: center center;
-  will-change: transform;
   touch-action: none;
+}
+
+/* Immich-style Chromium seam workaround shell (see chromeImageRaster.ts). */
+.chrome-raster-shell {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+  transform-origin: center center;
+  touch-action: none;
+}
+
+.chrome-raster-shell--fill {
+  width: 100%;
+  height: 100%;
+}
+
+.chrome-raster-shell--contain {
+  /* Width/height set inline to the contain-fit box for YARL flex centering. */
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.chrome-raster-layer {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.chrome-raster-layer.is-placed,
+.chrome-raster-layer.is-rasterized {
+  display: block;
+  place-items: unset;
+}
+
+.chrome-raster-layer.is-placed .mobile-gallery-media,
+.chrome-raster-layer.is-placed .yarl__slide_image,
+.chrome-raster-layer.is-rasterized .mobile-gallery-media,
+.chrome-raster-layer.is-rasterized .yarl__slide_image {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+}
+
+/* Decode the next quality off-screen; swap in only after onLoad. */
+.chrome-raster-pending {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .mobile-gallery-video {

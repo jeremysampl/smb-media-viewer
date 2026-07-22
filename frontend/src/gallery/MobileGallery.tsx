@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { mediaUrl } from '../api/client';
 import type { BrowseEntry, QualityTier } from '../types';
 import { useQualityPreference } from '../browser/ResolutionSelector';
+import { ChromeRasterImage } from './ChromeRasterImage';
 import { MediaDetailsPanel } from './MediaDetailsPanel';
 import { prefetchMediaMetadata } from './mediaMetadataCache';
 import { MobileGalleryVideoSlide } from './MobileGalleryVideoSlide';
@@ -443,6 +444,9 @@ export function MobileGallery({
     });
   }, []);
 
+  const qualityRef = useRef(quality);
+  qualityRef.current = quality;
+
   useLayoutEffect(() => {
     if (!open) {
       setIsOpening(false);
@@ -473,7 +477,7 @@ export function MobileGallery({
 
     const thumbRect = getThumbnailRect(entry.path);
     const openingLayer = thumbRect
-      ? buildFlyoutLayer(entry, rectFromDomRect(thumbRect, 12), quality)
+      ? buildFlyoutLayer(entry, rectFromDomRect(thumbRect, 12), qualityRef.current)
       : null;
 
     if (!openingLayer) {
@@ -507,7 +511,8 @@ export function MobileGallery({
       cancelAnimationFrame(raf);
       if (openTimer !== undefined) window.clearTimeout(openTimer);
     };
-  }, [open, initialIndex, mediaEntries, quality, updateMetrics, resetImageZoom]);
+    // quality intentionally omitted — changing quality must not reset to initialIndex.
+  }, [open, initialIndex, mediaEntries, updateMetrics, resetImageZoom]);
 
   useEffect(() => {
     resetImageZoom();
@@ -992,7 +997,7 @@ export function MobileGallery({
                     }
                   />
                 ) : entry.token ? (
-                  <img
+                  <ChromeRasterImage
                     className="mobile-gallery-media"
                     src={
                       hydratedPaths.has(entry.path)
@@ -1000,7 +1005,7 @@ export function MobileGallery({
                         : previewSrc
                     }
                     alt={entry.name}
-                    draggable={false}
+                    zoom={isActive ? imageZoom.scale : 1}
                     style={
                       isActive
                         ? { transform: imageZoomTransform(imageZoom) }

@@ -29,6 +29,7 @@ export async function getResizedImage(
 
   // Full: stream the original when browsers can display it (JPEG/PNG/WebP/…).
   // HEIC/TIFF/etc. still convert to WebP so the lightbox doesn't break.
+  // Chromium seam-line workaround lives in the frontend (see ChromeRasterImage).
   if (quality === 'full') {
     const nativeType = getBrowserNativeImageContentType(sourcePath);
     if (nativeType) {

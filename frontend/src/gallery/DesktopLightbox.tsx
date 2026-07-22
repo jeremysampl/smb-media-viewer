@@ -1,11 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
-import Lightbox, { IconButton, createIcon, useLightboxState } from 'yet-another-react-lightbox';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Lightbox, {
+  IconButton,
+  createIcon,
+  isImageSlide,
+  useLightboxState,
+} from 'yet-another-react-lightbox';
 import Video from 'yet-another-react-lightbox/plugins/video';
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 import 'yet-another-react-lightbox/styles.css';
 import { mediaUrl } from '../api/client';
 import type { BrowseEntry, QualityTier } from '../types';
 import { useQualityPreference } from '../browser/ResolutionSelector';
+import { ChromeRasterImage } from './ChromeRasterImage';
+import { shouldUseChromeImageRaster } from './chromeImageRaster';
 import { MediaDetailsPanel } from './MediaDetailsPanel';
 
 interface DesktopLightboxProps {
@@ -93,6 +100,11 @@ export function DesktopLightbox({
   const [detailsOpen, setDetailsOpen] = useState(false);
   /** Paths that have been the active slide — keep full-quality src so swipe-away doesn't swap renderers/src. */
   const [hydratedPaths, setHydratedPaths] = useState<Set<string>>(() => new Set());
+  /** Intrinsic sizes keyed by entry path so quality URL changes keep YARL zoom stable. */
+  const [imageSizeByPath, setImageSizeByPath] = useState<
+    Record<string, { width: number; height: number }>
+  >({});
+  const useChromeRaster = shouldUseChromeImageRaster();
 
   const mediaEntries = useMemo(
     () => entries.filter((entry) => entry.type === 'image' || entry.type === 'video'),
@@ -125,6 +137,16 @@ export function DesktopLightbox({
     });
   }, [index, mediaEntries]);
 
+  const rememberNaturalSize = useCallback((path: string, width: number, height: number) => {
+    setImageSizeByPath((previous) => {
+      const existing = previous[path];
+      if (existing && existing.width === width && existing.height === height) {
+        return previous;
+      }
+      return { ...previous, [path]: { width, height } };
+    });
+  }, []);
+
   const currentEntry = mediaEntries[index];
 
   const slides = useMemo(() => {
@@ -148,18 +170,25 @@ export function DesktopLightbox({
         };
       }
 
+      const src = entry.token
+        ? useFull
+          ? mediaUrl(entry.token, 'image', quality)
+          : preview
+        : '';
+      const size = imageSizeByPath[entry.path];
+
       return {
         // Same ImageSlide chrome for every offset; only the URL differs until first view.
-        src: entry.token
-          ? useFull
-            ? mediaUrl(entry.token, 'image', quality)
-            : preview
-          : '',
+        src,
         alt: entry.name,
         title: entry.name,
+        // Keep dims across quality URL changes so zoom math doesn't reset.
+        ...(size ? { width: size.width, height: size.height } : {}),
+        // Carried for render.slide → onNaturalSize path keying.
+        entryPath: entry.path,
       };
     });
-  }, [mediaEntries, quality, hydratedPaths]);
+  }, [mediaEntries, quality, hydratedPaths, imageSizeByPath]);
 
   return (
     <Lightbox
@@ -186,6 +215,24 @@ export function DesktopLightbox({
       carousel={{ finite: mediaEntries.length <= 1, preload: 1 }}
       animation={{ swipe: 500 }}
       render={{
+        slide: ({ slide, rect, zoom }) => {
+          if (!useChromeRaster || !isImageSlide(slide)) return undefined;
+          const entryPath = slide.entryPath ?? slide.src;
+          return (
+            <ChromeRasterImage
+              variant="desktop"
+              src={slide.src}
+              alt={slide.alt ?? ''}
+              className="yarl__slide_image"
+              containerWidth={rect.width}
+              containerHeight={rect.height}
+              zoom={zoom}
+              onNaturalSize={(width, height) => {
+                rememberNaturalSize(entryPath, width, height);
+              }}
+            />
+          );
+        },
         controls: () =>
           detailsOpen && currentEntry?.token ? (
             <MediaDetailsPanel
