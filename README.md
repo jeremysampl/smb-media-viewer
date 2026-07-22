@@ -205,8 +205,13 @@ Media tokens are signed and scoped to the authenticated user.
 ## Troubleshooting
 
 - **Login works but browse says "Authentication required"**: you are almost certainly on `http://` while the cookie was marked `Secure`. Set `COOKIE_SECURE=false` and `FRONTEND_ORIGIN=http://<nas-ip>:8080`, recreate the backend container, then log in again.
+- **Share list is empty** (main page has no folders):
+  1. On the NAS, run `testparm -s` and confirm share sections + `path =` lines.
+  2. Confirm compose mounts the **whole** `/etc/samba` directory (not only `smb.conf`) and `/etc/passwd` + `/etc/group`.
+  3. Confirm each share `path` exists in the container (usually via `/srv:/srv:ro`). Example check: `docker exec smb-media-viewer-backend ls /srv`
+  4. Check backend logs: `docker logs smb-media-viewer-backend 2>&1 | grep shares` — you should see `Loaded N share(s)`. If N>0 but the UI is empty, the user failed the `valid users` / group ACL filter (primary group `@users` is now supported).
+- **Shares appear but folders look empty / Path not found**: the `path =` in Samba does not match a mounted host directory inside the container. Align volume mounts with `testparm -s` paths.
 - **Login fails for valid users**: confirm `smbclient` works on the host and `SMB_HOST` is reachable from the backend container (`127.0.0.1` with host networking).
-- **Empty share list**: verify `smb.conf` share `path` values match mounted volumes and ACLs include the user or their group.
 - **Videos won't play**: first view triggers ffmpeg transcode; wait for cache generation or try a lower quality tier.
 - **High CPU usage**: lower default quality tier and reduce concurrent viewers; cache warms up over time.
 - **Date sort looks wrong on first open**: background indexing of that folder is still running; reopen the folder once indexing finishes (data lives under `INDEX_DIR`).

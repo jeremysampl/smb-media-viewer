@@ -33,6 +33,7 @@ export const config = {
   devMediaRoot: process.env.DEV_MEDIA_ROOT ?? path.join(process.cwd(), 'dev-media'),
   smbConfPath: process.env.SMB_CONF_PATH ?? '/etc/samba/smb.conf',
   groupFilePath: process.env.GROUP_FILE_PATH ?? '/etc/group',
+  passwdFilePath: process.env.PASSWD_FILE_PATH ?? '/etc/passwd',
   smbHost: process.env.SMB_HOST ?? 'localhost',
   mediaRoot: process.env.MEDIA_ROOT ?? '/srv',
   cacheDir: path.resolve(process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')),

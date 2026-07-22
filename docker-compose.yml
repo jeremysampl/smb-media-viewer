@@ -16,6 +16,7 @@ services:
       TOKEN_SECRET: ${TOKEN_SECRET:-change-me-token-secret}
       SMB_CONF_PATH: /etc/samba/smb.conf
       GROUP_FILE_PATH: /etc/group
+      PASSWD_FILE_PATH: /etc/passwd
       SMB_HOST: 127.0.0.1
       CACHE_DIR: /app/cache
       CACHE_MAX_BYTES: ${CACHE_MAX_BYTES:-10737418240}
@@ -26,8 +27,10 @@ services:
     volumes:
       - smb_media_cache:/app/cache
       - smb_media_index:/app/index
-      - /etc/samba/smb.conf:/etc/samba/smb.conf:ro
+      # Whole directory so smb.conf `include =` files are visible (OMV often uses these).
+      - /etc/samba:/etc/samba:ro
       - /etc/group:/etc/group:ro
+      - /etc/passwd:/etc/passwd:ro
       # Mount each RAID share root read-only. Adjust paths for your OMV setup.
       - /srv:/srv:ro
 
