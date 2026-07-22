@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { BrowseEntry } from '../types';
+import { gapForColumns } from './useMobileGridColumns';
 
 interface VirtualFileGridProps {
   entries: BrowseEntry[];
@@ -28,9 +29,26 @@ const DESKTOP_MIN_COL = 180;
 const DESKTOP_GAP = 16;
 const OVERSCAN_ROWS = 2;
 
-function estimateCardHeight(showDetails: boolean, isMobile: boolean): number {
-  if (isMobile) return showDetails ? 150 : 120;
-  return showDetails ? 220 : 190;
+function estimateRowHeight(
+  gridWidth: number,
+  columns: number,
+  gap: number,
+  showDetails: boolean,
+  isMobile: boolean,
+): number {
+  const colWidth =
+    gridWidth > 0
+      ? Math.max(1, (gridWidth - gap * (columns - 1)) / columns)
+      : isMobile
+        ? 110
+        : DESKTOP_MIN_COL;
+
+  // Square thumb fills the content box; padding + optional meta sit around it.
+  const pad = isMobile ? (showDetails ? 12 : 4) : showDetails ? 12 : 6;
+  const meta = showDetails ? (isMobile ? 26 : 34) : 0;
+  const gapInside = showDetails ? (isMobile ? 6 : 10) : 0;
+  const content = Math.max(1, colWidth - pad * 2);
+  return content + pad * 2 + gapInside + meta;
 }
 
 export function VirtualFileGrid({
@@ -80,15 +98,28 @@ export function VirtualFileGrid({
     return Math.max(1, Math.floor((width + DESKTOP_GAP) / (DESKTOP_MIN_COL + DESKTOP_GAP)));
   }, [isMobile, mobileColumns, width]);
 
+  const rowGap = isMobile ? gapForColumns(columns) : DESKTOP_GAP;
   const rowCount = Math.max(1, Math.ceil(entries.length / columns));
-  const rowHeight = estimateCardHeight(showGridDetails, isMobile);
+  const estimatedSize = estimateRowHeight(
+    width,
+    columns,
+    rowGap,
+    showGridDetails,
+    isMobile,
+  );
 
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollElement,
-    estimateSize: () => rowHeight + (isMobile ? 8 : DESKTOP_GAP),
+    estimateSize: () => estimatedSize,
+    gap: rowGap,
     overscan: OVERSCAN_ROWS,
   });
+
+  // Column / density changes invalidate cached row measurements.
+  useLayoutEffect(() => {
+    virtualizer.measure();
+  }, [virtualizer, columns, showGridDetails, estimatedSize, isMobile]);
 
   const measureRef = useCallback(
     (element: HTMLDivElement | null) => {
@@ -107,7 +138,6 @@ export function VirtualFileGrid({
   }
 
   const virtualRows = virtualizer.getVirtualItems();
-  const gap = isMobile ? undefined : DESKTOP_GAP;
 
   return (
     <div
@@ -118,7 +148,7 @@ export function VirtualFileGrid({
     >
       <div
         className="file-grid-virtual-inner"
-        style={{ height: virtualizer.getTotalSize(), position: 'relative' }}
+        style={{ height: virtualizer.getTotalSize(), position: 'relative', width: '100%' }}
       >
         {virtualRows.map((virtualRow) => {
           const start = virtualRow.index * columns;
@@ -137,7 +167,7 @@ export function VirtualFileGrid({
                 transform: `translateY(${virtualRow.start}px)`,
                 display: 'grid',
                 gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-                gap: isMobile ? 'var(--gap, 8px)' : gap,
+                gap: isMobile ? 'var(--gap, 8px)' : DESKTOP_GAP,
               }}
             >
               {rowEntries.map((entry, offset) => renderCard(entry, start + offset))}
