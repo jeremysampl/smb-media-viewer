@@ -9,6 +9,7 @@ import {
   writeAtomic,
 } from '../cache/cache.js';
 import { ensureIndexAsset } from '../index/indexer.js';
+import { getBrowserNativeImageContentType } from './fileTypes.js';
 
 export async function getResizedImage(
   sourcePath: string,
@@ -24,6 +25,15 @@ export async function getResizedImage(
       'image',
     );
     return { filePath: indexed.filePath, contentType: indexed.contentType };
+  }
+
+  // Full: stream the original when browsers can display it (JPEG/PNG/WebP/…).
+  // HEIC/TIFF/etc. still convert to WebP so the lightbox doesn't break.
+  if (quality === 'full') {
+    const nativeType = getBrowserNativeImageContentType(sourcePath);
+    if (nativeType) {
+      return { filePath: sourcePath, contentType: nativeType };
+    }
   }
 
   const key = buildCacheKey(sourcePath, stats.mtimeMs, quality, 'image');

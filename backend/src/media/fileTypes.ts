@@ -12,6 +12,17 @@ const IMAGE_EXTENSIONS = new Set([
   '.avif',
 ]);
 
+/** Formats browsers can show as-is in <img> across Chromium/Firefox/Safari. */
+const BROWSER_NATIVE_IMAGE_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.avif': 'image/avif',
+};
+
 const VIDEO_EXTENSIONS = new Set([
   '.mp4',
   '.m4v',
@@ -48,4 +59,9 @@ export function isVideoFile(filename: string): boolean {
 
 export function isMediaFile(filename: string): boolean {
   return isImageFile(filename) || isVideoFile(filename);
+}
+
+/** Content-Type if the file can be streamed to browsers without conversion; else null. */
+export function getBrowserNativeImageContentType(filename: string): string | null {
+  return BROWSER_NATIVE_IMAGE_TYPES[getExtension(filename)] ?? null;
 }

@@ -14,12 +14,12 @@ Self-hosted media gallery for OpenMediaVault NAS shares. Users sign in with thei
 
 | Tier | Images | Video |
 |------|--------|-------|
-| Very Low | 320px | 240p |
-| Low | 640px | 480p |
-| Medium | 1280px | 720p |
-| High | 1920px | 1080p |
-| Very High | 2560px | 1440p |
-| Full | Original | Original/remuxed |
+| Very Low | 320px WebP | 240p |
+| Low | 640px WebP | 480p |
+| Medium | 1280px WebP | 720p |
+| High | 1920px WebP | 1080p |
+| Very High | 2560px WebP | 1440p |
+| Full | Original file when browser-native (JPEG/PNG/GIF/WebP/AVIF/BMP); otherwise WebP convert (HEIC/TIFF/…) | Remux/transcode |
 
 Transcodes for the lightbox are cached on disk under `CACHE_DIR` and may be evicted when the cache exceeds `CACHE_MAX_BYTES`.
 
