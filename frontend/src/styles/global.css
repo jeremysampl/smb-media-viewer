@@ -625,6 +625,34 @@ button.breadcrumb-chip:focus-visible,
   gap: 1rem;
 }
 
+/* Virtualized folders: outer CSS grid/flex would break absolute row positioning. */
+.file-grid.file-grid-virtual,
+.file-grid-mobile.file-grid-virtual {
+  display: block;
+}
+
+.file-grid-virtual-row {
+  align-items: stretch;
+}
+
+.file-grid-virtual-row .file-card {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/*
+ * Mobile non-virtual cards size via flex + --cols against the full grid width.
+ * Inside a virtual row cell that calc is wrong (fraction of the cell). Override
+ * with higher specificity so cards fill each column.
+ */
+.file-grid-mobile.file-grid-virtual .file-grid-virtual-row .file-card {
+  flex: none;
+  width: 100%;
+  max-width: none;
+}
+
 @property --gap {
   syntax: '<length>';
   inherits: true;

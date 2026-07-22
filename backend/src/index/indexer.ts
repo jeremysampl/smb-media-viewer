@@ -4,9 +4,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { writeAtomic } from '../cache/cache.js';
+import { config } from '../config.js';
 import { getImageCaptureTime } from '../media/captureTime.js';
 import { getQualityProfile } from '../media/quality.js';
 import { getVideoBrowseInfo } from '../media/videoMetadata.js';
+import { createSemaphore } from '../util/concurrency.js';
 import { getIndexDb, getThumbPath, upsertMediaIndexRow } from './db.js';
 
 export interface IndexJob {
@@ -16,8 +18,12 @@ export interface IndexJob {
   kind: 'image' | 'video';
 }
 
-const INDEX_CONCURRENCY = 2;
-const queue: IndexJob[] = [];
+/** Caps Sharp/ffmpeg/EXIF work across background + on-demand HTTP paths. */
+const indexWork = createSemaphore(config.indexConcurrency);
+
+type QueuedIndexJob = IndexJob & { priority: 'high' | 'low' };
+
+const queue: QueuedIndexJob[] = [];
 const queuedPaths = new Set<string>();
 const inFlight = new Map<string, Promise<{ filePath: string; contentType: string } | null>>();
 let activeWorkers = 0;
@@ -259,23 +265,33 @@ async function indexOne(
     return null;
   }
 
-  const work = (async () => {
+  const work = indexWork.run(async () => {
     let captureTime: string | null = null;
     let duration: number | null = null;
     let thumbReady = false;
-
-    if (job.kind === 'image') {
-      captureTime = (await getImageCaptureTime(job.absolutePath)) ?? null;
-    } else {
-      const info = await getVideoBrowseInfo(job.absolutePath);
-      captureTime = info.captureTime ?? null;
-      duration = info.duration ?? null;
-    }
 
     try {
       await fs.access(thumbPath);
       thumbReady = true;
     } catch {
+      // generate below
+    }
+
+    // Prefer serving an existing thumb immediately for HTTP; metadata can catch up later.
+    // Background jobs always refresh capture/duration.
+    const needsMeta = !options.requireThumb || !thumbReady;
+
+    if (needsMeta) {
+      if (job.kind === 'image') {
+        captureTime = (await getImageCaptureTime(job.absolutePath)) ?? null;
+      } else {
+        const info = await getVideoBrowseInfo(job.absolutePath);
+        captureTime = info.captureTime ?? null;
+        duration = info.duration ?? null;
+      }
+    }
+
+    if (!thumbReady) {
       try {
         if (job.kind === 'image') {
           await generateImageThumb(job.absolutePath, thumbPath);
@@ -288,19 +304,21 @@ async function indexOne(
       }
     }
 
-    upsertMediaIndexRow({
-      absolutePath: job.absolutePath,
-      mtimeMs: job.mtimeMs,
-      size: job.size,
-      kind: job.kind,
-      thumbKey: thumbReady ? thumbKey : null,
-      captureTime,
-      duration,
-    });
+    if (needsMeta || thumbReady) {
+      upsertMediaIndexRow({
+        absolutePath: job.absolutePath,
+        mtimeMs: job.mtimeMs,
+        size: job.size,
+        kind: job.kind,
+        thumbKey: thumbReady ? thumbKey : null,
+        captureTime,
+        duration,
+      });
+    }
 
     if (!thumbReady) return null;
     return { filePath: thumbPath, contentType: 'image/webp' };
-  })();
+  });
 
   inFlight.set(flightKey, work);
   try {
@@ -314,12 +332,21 @@ async function indexOne(
   }
 }
 
+function takeNextJob(): QueuedIndexJob | undefined {
+  const highIndex = queue.findIndex((job) => job.priority === 'high');
+  if (highIndex >= 0) {
+    return queue.splice(highIndex, 1)[0];
+  }
+  return queue.shift();
+}
+
 function pumpQueue(): void {
-  while (activeWorkers < INDEX_CONCURRENCY && queue.length > 0) {
-    const job = queue.shift()!;
+  while (activeWorkers < config.indexConcurrency && queue.length > 0) {
+    const job = takeNextJob();
+    if (!job) return;
     activeWorkers += 1;
 
-    void indexOne(job, { requireThumb: false })
+    void indexOne(job, { requireThumb: job.priority === 'high' })
       .catch((error) => {
         console.error(`[index] Failed for ${job.absolutePath}:`, error);
       })
@@ -335,7 +362,7 @@ export function enqueueIndexJobs(jobs: IndexJob[]): void {
   for (const job of jobs) {
     if (queuedPaths.has(job.absolutePath)) continue;
     queuedPaths.add(job.absolutePath);
-    queue.push(job);
+    queue.push({ ...job, priority: 'low' });
   }
   pumpQueue();
 }
@@ -347,6 +374,17 @@ export async function ensureIndexAsset(
   size: number,
   kind: 'image' | 'video',
 ): Promise<{ filePath: string; contentType: string }> {
+  const thumbKey = thumbKeyFor(absolutePath, mtimeMs, kind);
+  const thumbPath = getThumbPath(thumbKey);
+
+  // Fast path: existing thumb — no EXIF/ffmpeg, no semaphore slot.
+  try {
+    await fs.access(thumbPath);
+    return { filePath: thumbPath, contentType: 'image/webp' };
+  } catch {
+    // generate below
+  }
+
   const result = await indexOne(
     { absolutePath, mtimeMs, size, kind },
     { requireThumb: true },

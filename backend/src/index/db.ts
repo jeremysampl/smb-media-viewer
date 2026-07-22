@@ -107,9 +107,9 @@ export function upsertMediaIndexRow(row: {
         mtime_ms = excluded.mtime_ms,
         size = excluded.size,
         kind = excluded.kind,
-        thumb_key = excluded.thumb_key,
-        capture_time = excluded.capture_time,
-        duration = excluded.duration,
+        thumb_key = COALESCE(excluded.thumb_key, media_index.thumb_key),
+        capture_time = COALESCE(excluded.capture_time, media_index.capture_time),
+        duration = COALESCE(excluded.duration, media_index.duration),
         indexed_at = excluded.indexed_at
     `,
     )

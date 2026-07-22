@@ -8,6 +8,7 @@ import { browsePathToUrl, urlSplatToBrowsePath } from './browsePath';
 import { MediaGallery } from '../gallery/MediaGallery';
 import { LazyThumbnail } from './LazyThumbnail';
 import { FileTypeIcon } from './FileTypeIcon';
+import { VirtualFileGrid } from './VirtualFileGrid';
 import { ResolutionSelector, useQualityPreference } from './ResolutionSelector';
 import { SortSelector, useSortPreference } from './SortSelector';
 import { FileTypeSelector } from './FileTypeSelector';
@@ -176,10 +177,15 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
     return () => controller.abort();
   }, [currentPath]);
 
-  const sortedEntries = useMemo(
-    () => sortEntries(filterEntriesByFileType(entries, fileTypeFilter), sort),
-    [entries, fileTypeFilter, sort],
-  );
+  const sortedEntries = useMemo(() => {
+    const filtered = filterEntriesByFileType(entries, fileTypeFilter);
+    const dateSort = sort === 'date_asc' || sort === 'date_desc';
+    // While capture times are still filling in, keep date order stable on mtime
+    // so the grid doesn't reshuffle and re-request thumbs.
+    return sortEntries(filtered, sort, {
+      preferMtime: dateSort && indexingActive,
+    });
+  }, [entries, fileTypeFilter, sort, indexingActive]);
 
   const gridLayoutKey = useMemo(
     () => `${fileTypeFilter}\n${sortedEntries.map((entry) => entry.path).join('\n')}`,
@@ -262,16 +268,11 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
               if (!prior.captureTime && nextCapture) filled += 1;
               changed = true;
 
-              const thumbnailUrl =
-                !prior.captureTime && nextCapture && prior.thumbnailUrl
-                  ? `${prior.thumbnailUrl}${prior.thumbnailUrl.includes('?') ? '&' : '?'}v=1`
-                  : prior.thumbnailUrl;
-
               return {
                 ...prior,
                 captureTime: nextCapture,
                 duration: nextDuration,
-                thumbnailUrl,
+                thumbnailUrl: prior.thumbnailUrl,
               };
             });
 
@@ -288,7 +289,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
           });
         })
         .catch(() => undefined);
-    }, 2000);
+    }, 5000);
 
     return () => {
       cancelled = true;
@@ -452,15 +453,18 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
       ) : null}
 
       {!loading && !error ? (
-        <div
-          ref={gridRef}
+        <VirtualFileGrid
+          entries={sortedEntries}
+          isMobile={isMobile}
+          mobileColumns={columns}
+          showGridDetails={showGridDetails}
           className={`file-grid${isMobile ? ' file-grid-mobile' : ''}${
             isPinching ? ' is-pinching' : ''
           }`}
           style={gridStyle}
           aria-busy={typeFilterBusy || sortBusy}
-        >
-          {sortedEntries.map((entry) => {
+          gridRef={gridRef}
+          renderCard={(entry) => {
             const isMedia = entry.type === 'image' || entry.type === 'video';
             const showMeta =
               entry.type === 'folder' ||
@@ -532,8 +536,8 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
                 ) : null}
               </button>
             );
-          })}
-        </div>
+          }}
+        />
       ) : null}
 
       {showSelectionChrome ? (

@@ -20,15 +20,15 @@ function compareName(a: BrowseEntry, b: BrowseEntry): number {
   return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
 }
 
-function getSortTimestamp(entry: BrowseEntry): number {
-  const value = entry.captureTime ?? entry.mtime;
+function getSortTimestamp(entry: BrowseEntry, preferMtime = false): number {
+  const value = preferMtime ? entry.mtime : entry.captureTime ?? entry.mtime;
   if (!value) return 0;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
-function compareDate(a: BrowseEntry, b: BrowseEntry): number {
-  return getSortTimestamp(a) - getSortTimestamp(b);
+function compareDate(a: BrowseEntry, b: BrowseEntry, preferMtime = false): number {
+  return getSortTimestamp(a, preferMtime) - getSortTimestamp(b, preferMtime);
 }
 
 function compareSize(a: BrowseEntry, b: BrowseEntry): number {
@@ -41,7 +41,12 @@ function compareType(a: BrowseEntry, b: BrowseEntry): number {
   return compareName(a, b);
 }
 
-export function sortEntries(entries: BrowseEntry[], sort: SortMethod): BrowseEntry[] {
+export function sortEntries(
+  entries: BrowseEntry[],
+  sort: SortMethod,
+  options?: { preferMtime?: boolean },
+): BrowseEntry[] {
+  const preferMtime = options?.preferMtime === true;
   const folders = entries.filter((entry) => entry.type === 'folder');
   const media = entries.filter((entry) => entry.type !== 'folder');
 
@@ -52,10 +57,10 @@ export function sortEntries(entries: BrowseEntry[], sort: SortMethod): BrowseEnt
         sorted.sort((a, b) => compareName(b, a));
         break;
       case 'date_desc':
-        sorted.sort((a, b) => compareDate(b, a));
+        sorted.sort((a, b) => compareDate(b, a, preferMtime));
         break;
       case 'date_asc':
-        sorted.sort((a, b) => compareDate(a, b));
+        sorted.sort((a, b) => compareDate(a, b, preferMtime));
         break;
       case 'size_desc':
         sorted.sort((a, b) => compareSize(b, a));
