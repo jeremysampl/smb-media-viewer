@@ -97,10 +97,12 @@ docker compose up -d --build
 
 ### Publishing images (maintainers)
 
-Pushes to `main` and version tags (`v1.2.3`) run [.github/workflows/publish-images.yml](.github/workflows/publish-images.yml), which builds and pushes:
+Pushes to `main` and version tags (`v1.2.3`) run [.github/workflows/publish-images.yml](.github/workflows/publish-images.yml), which builds and pushes multi-arch images (`linux/amd64` and `linux/arm64`) for:
 
 - `ghcr.io/jeremysampl/smb-media-viewer-backend`
 - `ghcr.io/jeremysampl/smb-media-viewer-frontend`
+
+Docker pulls the matching architecture automatically for your NAS.
 
 After the **first** successful workflow run, make the packages public (otherwise anonymous `docker pull` fails):
 
