@@ -199,10 +199,12 @@ Media tokens are signed and scoped to the authenticated user.
 - Backend uses `network_mode: host` so it can reach the native Samba daemon on port 445.
 - Share access is enforced using Samba ACLs from `smb.conf` (share-level in v1).
 - Paths outside allowed shares return 404 to avoid leaking filesystem layout.
-- Put the app behind HTTPS (reverse proxy) for remote access.
+- Session cookies use `Secure` only when `COOKIE_SECURE=true` or `FRONTEND_ORIGIN` is `https://...`. Leave `COOKIE_SECURE=false` for plain HTTP on the LAN.
+- Put the app behind HTTPS (reverse proxy) for remote access, then set `FRONTEND_ORIGIN=https://...` and `COOKIE_SECURE=true`.
 
 ## Troubleshooting
 
+- **Login works but browse says "Authentication required"**: you are almost certainly on `http://` while the cookie was marked `Secure`. Set `COOKIE_SECURE=false` and `FRONTEND_ORIGIN=http://<nas-ip>:8080`, recreate the backend container, then log in again.
 - **Login fails for valid users**: confirm `smbclient` works on the host and `SMB_HOST` is reachable from the backend container (`127.0.0.1` with host networking).
 - **Empty share list**: verify `smb.conf` share `path` values match mounted volumes and ACLs include the user or their group.
 - **Videos won't play**: first view triggers ffmpeg transcode; wait for cache generation or try a lower quality tier.

@@ -25,18 +25,25 @@ router.post('/login', async (req, res) => {
 
   const token = signAuthToken(username);
 
-  res.cookie(config.cookieName, token, {
+  const cookieOptions = {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    // Must be false for plain HTTP (typical LAN). Browsers ignore Secure cookies on http://.
+    secure: config.cookieSecure,
     maxAge: 8 * 60 * 60 * 1000,
-  });
+  };
+
+  res.cookie(config.cookieName, token, cookieOptions);
 
   res.json({ username, token });
 });
 
 router.post('/logout', (_req, res) => {
-  res.clearCookie(config.cookieName);
+  res.clearCookie(config.cookieName, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: config.cookieSecure,
+  });
   res.json({ ok: true });
 });
 

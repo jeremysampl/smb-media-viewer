@@ -21,6 +21,8 @@ services:
       CACHE_MAX_BYTES: ${CACHE_MAX_BYTES:-10737418240}
       INDEX_DIR: /app/index
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:8080}
+      # Optional override: true/false. If unset, derived from FRONTEND_ORIGIN (https → true).
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
     volumes:
       - smb_media_cache:/app/cache
       - smb_media_index:/app/index

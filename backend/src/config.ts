@@ -13,11 +13,21 @@ function requireEnv(name: string, fallback?: string): string {
   return value;
 }
 
+const frontendOrigin = process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173';
+
+/** Secure cookies only work over HTTPS. LAN HTTP installs must leave this false. */
+function resolveCookieSecure(origin: string): boolean {
+  if (process.env.COOKIE_SECURE === 'true') return true;
+  if (process.env.COOKIE_SECURE === 'false') return false;
+  return origin.startsWith('https://');
+}
+
 export const config = {
   port: Number(process.env.PORT ?? 3001),
   jwtSecret: requireEnv('JWT_SECRET', 'change-me-in-production'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '8h',
   cookieName: process.env.COOKIE_NAME ?? 'smb_media_token',
+  cookieSecure: resolveCookieSecure(frontendOrigin),
   localDev: process.env.LOCAL_DEV === 'true',
   devShareName: process.env.DEV_SHARE_NAME ?? 'media',
   devMediaRoot: process.env.DEV_MEDIA_ROOT ?? path.join(process.cwd(), 'dev-media'),
@@ -31,5 +41,5 @@ export const config = {
   /** Permanent SQLite metadata + tiny grid thumbs/posters (not evicted). */
   indexDir: path.resolve(process.env.INDEX_DIR ?? path.join(process.cwd(), 'index')),
   tokenSecret: requireEnv('TOKEN_SECRET', 'change-me-token-secret'),
-  frontendOrigin: process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173',
+  frontendOrigin,
 };
