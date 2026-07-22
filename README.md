@@ -61,9 +61,10 @@ cp .env.example .env
    BACKEND_MEM_LIMIT=512m
    BACKEND_CPUS=1.0
    BACKEND_NODE_MAX_OLD_SPACE_MB=384
+   INDEX_CONCURRENCY=1
    ```
 
-   `BACKEND_MEM_LIMIT` / `BACKEND_CPUS` are Docker cgroup caps. `BACKEND_NODE_MAX_OLD_SPACE_MB` caps the V8 heap so Node tends to error before the whole Pi OOMs (leave headroom under the mem limit for Sharp/ffmpeg).
+   `BACKEND_MEM_LIMIT` / `BACKEND_CPUS` are Docker cgroup caps. `BACKEND_NODE_MAX_OLD_SPACE_MB` caps the V8 heap so Node tends to error before the whole Pi OOMs (leave headroom under the mem limit for Sharp/ffmpeg). `INDEX_CONCURRENCY` caps how many Sharp/ffmpeg/EXIF jobs run at once (default `2`); use `1` on a Pi if large folders still spike CPU.
 
 3. Update `docker-compose.yml` volume mounts if your share roots are not under `/srv`.
 
@@ -214,7 +215,7 @@ Media tokens are signed and scoped to the authenticated user.
 
 ## Troubleshooting
 
-- **Pi / host freezes during indexing**: lower `BACKEND_MEM_LIMIT`, `BACKEND_CPUS`, and `BACKEND_NODE_MAX_OLD_SPACE_MB` in `.env`, then `docker compose up -d`. Defaults are `512m` / `1.0` / `384`.
+- **Pi / host freezes during indexing**: lower `BACKEND_MEM_LIMIT`, `BACKEND_CPUS`, `BACKEND_NODE_MAX_OLD_SPACE_MB`, and `INDEX_CONCURRENCY` in `.env`, then `docker compose up -d`. Pi-friendly values are `512m` / `1.0` / `384` / `1`.
 - **Login works but browse says "Authentication required"**: you are almost certainly on `http://` while the cookie was marked `Secure`. Set `COOKIE_SECURE=false` and `FRONTEND_ORIGIN=http://<nas-ip>:8080`, recreate the backend container, then log in again.
 - **Share list is empty** (main page has no folders):
   1. On the NAS, run `testparm -s` and confirm share sections + `path =` lines.
@@ -225,8 +226,8 @@ Media tokens are signed and scoped to the authenticated user.
 - **Login fails for valid users**: confirm `smbclient` works on the host and `SMB_HOST` is reachable from the backend container (`127.0.0.1` with host networking).
 - **Videos won't play**: first view triggers ffmpeg transcode; wait for cache generation or try a lower quality tier.
 - **High CPU usage**: lower default quality tier and reduce concurrent viewers; cache warms up over time.
-- **Date sort looks wrong on first open**: background indexing of that folder is still running; reopen the folder once indexing finishes (data lives under `INDEX_DIR`).
-- **Slow first thumbnail row**: grid thumbs are generated into `INDEX_DIR` on demand / while indexing; they are permanent afterward.
+- **Date sort looks wrong on first open**: while indexing is active the grid keeps mtime order so thumbs don’t reshuffle; after indexing finishes it switches to capture time (data lives under `INDEX_DIR`).
+- **Slow first thumbnail row**: grid thumbs are generated into `INDEX_DIR` on demand / while indexing (capped by `INDEX_CONCURRENCY`); they are permanent afterward.
 
 ## License
 

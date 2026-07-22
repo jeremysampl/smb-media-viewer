@@ -25,6 +25,8 @@ services:
       CACHE_DIR: /app/cache
       CACHE_MAX_BYTES: ${CACHE_MAX_BYTES:-10737418240}
       INDEX_DIR: /app/index
+      # Parallel Sharp/ffmpeg/EXIF jobs (background index + on-demand thumbs). Pi: 1–2.
+      INDEX_CONCURRENCY: ${INDEX_CONCURRENCY:-2}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:8080}
       # Optional override: true/false. If unset, derived from FRONTEND_ORIGIN (https → true).
       COOKIE_SECURE: ${COOKIE_SECURE:-}

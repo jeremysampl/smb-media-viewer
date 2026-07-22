@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { acquireThumbSlot } from './thumbLoadGate';
 
 interface LazyThumbnailProps {
   src: string;
@@ -25,16 +26,23 @@ function marginFor(element: HTMLElement, bufferRows: number): number {
 export function LazyThumbnail({
   src,
   alt,
-  bufferRows = 2,
+  bufferRows = 1,
   layoutKey,
 }: LazyThumbnailProps) {
   const ref = useRef<HTMLDivElement>(null);
   const retryCountRef = useRef(0);
+  const releaseSlotRef = useRef<(() => void) | null>(null);
   const [inView, setInView] = useState(false);
+  const [slotReady, setSlotReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [awaitingRetry, setAwaitingRetry] = useState(false);
   const [giveUp, setGiveUp] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
+
+  const releaseSlot = () => {
+    releaseSlotRef.current?.();
+    releaseSlotRef.current = null;
+  };
 
   useEffect(() => {
     retryCountRef.current = 0;
@@ -42,6 +50,8 @@ export function LazyThumbnail({
     setAwaitingRetry(false);
     setGiveUp(false);
     setRetryKey(0);
+    setSlotReady(false);
+    releaseSlot();
   }, [src]);
 
   useEffect(() => {
@@ -58,8 +68,6 @@ export function LazyThumbnail({
           setInView(true);
           return;
         }
-        // Keep loaded thumbs mounted while only slightly off-screen; drop when
-        // clearly away so filter/sort reshuffles still refresh correctly.
         update();
       },
       { rootMargin: `${marginFor(element, bufferRows)}px 0px` },
@@ -70,8 +78,6 @@ export function LazyThumbnail({
     return () => observer.disconnect();
   }, [bufferRows, layoutKey, src]);
 
-  // After sort/filter layout changes, re-check visibility without blanking first
-  // (blanking raced the observer and left some thumbs stuck unloaded).
   useLayoutEffect(() => {
     if (layoutKey === undefined) return undefined;
 
@@ -98,6 +104,31 @@ export function LazyThumbnail({
     };
   }, [layoutKey, bufferRows]);
 
+  // Gate in-flight fetches only — release as soon as the image finishes (or cancels).
+  useEffect(() => {
+    if (!inView || giveUp || awaitingRetry || loaded) {
+      releaseSlot();
+      if (!loaded) setSlotReady(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    void acquireThumbSlot().then((release) => {
+      if (cancelled) {
+        release();
+        return;
+      }
+      releaseSlotRef.current = release;
+      setSlotReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+      releaseSlot();
+      setSlotReady(false);
+    };
+  }, [inView, giveUp, awaitingRetry, loaded, src, retryKey]);
+
   useEffect(() => {
     if (!awaitingRetry || giveUp) return undefined;
     const timer = window.setTimeout(() => {
@@ -105,20 +136,25 @@ export function LazyThumbnail({
       setAwaitingRetry(false);
       setLoaded(false);
       setRetryKey((value) => value + 1);
-    }, 1500);
+    }, 2000);
     return () => window.clearTimeout(timer);
   }, [awaitingRetry, giveUp]);
 
-  const showImage = inView && !giveUp && !awaitingRetry;
+  const showImage = inView && !giveUp && !awaitingRetry && (slotReady || loaded);
   const imageRef = useRef<HTMLImageElement | null>(null);
 
+  const markLoaded = () => {
+    releaseSlot();
+    setLoaded(true);
+  };
+
   useLayoutEffect(() => {
-    if (!showImage) return;
+    if (!showImage || loaded) return;
     const image = imageRef.current;
     if (image?.complete && image.naturalWidth > 0) {
-      setLoaded(true);
+      markLoaded();
     }
-  }, [showImage, src, retryKey]);
+  }, [showImage, src, retryKey, loaded]);
 
   return (
     <div
@@ -134,8 +170,9 @@ export function LazyThumbnail({
           draggable={false}
           decoding="async"
           onDragStart={(event) => event.preventDefault()}
-          onLoad={() => setLoaded(true)}
+          onLoad={markLoaded}
           onError={() => {
+            releaseSlot();
             if (retryCountRef.current >= MAX_RETRIES) {
               setGiveUp(true);
               return;

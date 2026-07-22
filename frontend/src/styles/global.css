@@ -625,6 +625,23 @@ button.breadcrumb-chip:focus-visible,
   gap: 1rem;
 }
 
+/* Virtualized folders: outer CSS grid/flex would break absolute row positioning. */
+.file-grid.file-grid-virtual,
+.file-grid-mobile.file-grid-virtual {
+  display: block;
+}
+
+.file-grid-virtual-row .file-card {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.file-grid-mobile.file-grid-virtual .file-grid-virtual-row .file-card {
+  flex: none;
+}
+
 @property --gap {
   syntax: '<length>';
   inherits: true;

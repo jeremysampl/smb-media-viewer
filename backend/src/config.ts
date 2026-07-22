@@ -41,6 +41,11 @@ export const config = {
   cacheCleanupCron: process.env.CACHE_CLEANUP_CRON ?? '0 */6 * * *',
   /** Permanent SQLite metadata + tiny grid thumbs/posters (not evicted). */
   indexDir: path.resolve(process.env.INDEX_DIR ?? path.join(process.cwd(), 'index')),
+  /**
+   * Max concurrent heavy index jobs (EXIF/ffprobe + thumb/poster generation).
+   * Shared by background indexing and on-demand /image|/poster requests.
+   */
+  indexConcurrency: Math.max(1, Number(process.env.INDEX_CONCURRENCY ?? 2)),
   tokenSecret: requireEnv('TOKEN_SECRET', 'change-me-token-secret'),
   frontendOrigin,
 };
