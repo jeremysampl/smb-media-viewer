@@ -55,6 +55,16 @@ cp .env.example .env
 
 2. Edit `.env` and set strong values for `JWT_SECRET` and `TOKEN_SECRET`. Set `FRONTEND_ORIGIN` to the URL you will open in the browser (e.g. `http://192.168.1.50:8080` or `https://media.example.com`).
 
+   On a Raspberry Pi (or any low-RAM host), keep or tighten the backend limits in `.env`:
+
+   ```bash
+   BACKEND_MEM_LIMIT=512m
+   BACKEND_CPUS=1.0
+   BACKEND_NODE_MAX_OLD_SPACE_MB=384
+   ```
+
+   `BACKEND_MEM_LIMIT` / `BACKEND_CPUS` are Docker cgroup caps. `BACKEND_NODE_MAX_OLD_SPACE_MB` caps the V8 heap so Node tends to error before the whole Pi OOMs (leave headroom under the mem limit for Sharp/ffmpeg).
+
 3. Update `docker-compose.yml` volume mounts if your share roots are not under `/srv`.
 
 Example if a share lives at `/srv/dev-disk-by-uuid-abc123/photos`:
@@ -204,6 +214,7 @@ Media tokens are signed and scoped to the authenticated user.
 
 ## Troubleshooting
 
+- **Pi / host freezes during indexing**: lower `BACKEND_MEM_LIMIT`, `BACKEND_CPUS`, and `BACKEND_NODE_MAX_OLD_SPACE_MB` in `.env`, then `docker compose up -d`. Defaults are `512m` / `1.0` / `384`.
 - **Login works but browse says "Authentication required"**: you are almost certainly on `http://` while the cookie was marked `Secure`. Set `COOKIE_SECURE=false` and `FRONTEND_ORIGIN=http://<nas-ip>:8080`, recreate the backend container, then log in again.
 - **Share list is empty** (main page has no folders):
   1. On the NAS, run `testparm -s` and confirm share sections + `path =` lines.
