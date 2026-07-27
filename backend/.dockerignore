@@ -1,5 +1,9 @@
 node_modules
 dist
 cache
+index
 .env
+*.db
+*.db-shm
+*.db-wal
 npm-debug.log*
