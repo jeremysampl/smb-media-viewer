@@ -15,7 +15,7 @@ function parseList(value: string | undefined): string[] {
     .map((entry) => entry.trim())
     .filter(Boolean)
     .map((entry) => {
-      // Order matters: @"users" / +"users" / "jeremy"
+      // Order matters: @"users" / +"users" / "alice"
       let cleaned = entry.replace(/^["']+|["']+$/g, '');
       if (cleaned.startsWith('@') || cleaned.startsWith('+')) {
         cleaned = cleaned.slice(1);

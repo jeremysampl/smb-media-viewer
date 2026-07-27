@@ -73,10 +73,8 @@ export function getImageLayoutMetrics(
   const fitScale = Math.min(stageWidth / naturalWidth, stageHeight / naturalHeight);
   const baseWidth = naturalWidth * fitScale;
   const baseHeight = naturalHeight * fitScale;
-  const pixelRatioMax = Math.max(
-    naturalWidth / baseWidth,
-    naturalHeight / baseHeight,
-  ) * MAX_ZOOM_PIXEL_RATIO;
+  const pixelRatioMax =
+    Math.max(naturalWidth / baseWidth, naturalHeight / baseHeight) * MAX_ZOOM_PIXEL_RATIO;
 
   return {
     baseWidth,
