@@ -51,9 +51,9 @@ interface AdminDataPanelProps<T, K extends string> {
   selectable?: boolean;
   entityLabel?: string;
   clearBusy?: boolean;
-  onClearSelected?: (ids: string[]) => void | Promise<void>;
-  onClearFolder?: (folder: string) => void | Promise<void>;
-  onClearAll?: () => void | Promise<void>;
+  onClearSelected?: (ids: string[]) => void | Promise<unknown>;
+  onClearFolder?: (folder: string) => void | Promise<unknown>;
+  onClearAll?: () => void | Promise<unknown>;
 }
 
 export function AdminDataPanel<T, K extends string>({

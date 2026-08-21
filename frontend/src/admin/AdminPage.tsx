@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { getAdminStatus, type AdminStatus } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { UserMenu } from '../browser/UserMenu';
+import { Button } from '../ui';
 import { CachePanel } from './CachePanel';
 import { formatBytes, formatDuration } from './format';
 import { IndexPanel } from './IndexPanel';
@@ -184,13 +185,9 @@ export function AdminPage() {
             <dl className="admin-metrics">
               <Metric label="Cached files" value={String(cache?.fileCount ?? '—')} />
             </dl>
-            <button
-              type="button"
-              className="admin-inline-link"
-              onClick={() => setSection('cache')}
-            >
+            <Button variant="link" className="admin-inline-link" onClick={() => setSection('cache')}>
               Browse cache →
-            </button>
+            </Button>
           </section>
 
           <section className="admin-card">
@@ -219,13 +216,9 @@ export function AdminPage() {
                 value={index ? index.indexedFiles.toLocaleString() : '—'}
               />
             </dl>
-            <button
-              type="button"
-              className="admin-inline-link"
-              onClick={() => setSection('index')}
-            >
+            <Button variant="link" className="admin-inline-link" onClick={() => setSection('index')}>
               Browse index →
-            </button>
+            </Button>
           </section>
         </div>
       ) : null}

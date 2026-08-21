@@ -13,6 +13,7 @@ import {
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { fetchRawBlob } from '../../api/client';
 import { touchCenter, touchDistance } from '../../gallery/mobileImageZoom';
+import { IconButton } from '../../ui';
 import type { FileViewerProps } from '../types';
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -102,7 +103,7 @@ function PdfPage({
       try {
         await renderTask.promise;
       } catch {
-        // Ignore cancelled renders when scale changes quickly.
+        // Cancelled when scale changes mid-render.
       }
     })();
 
@@ -232,7 +233,7 @@ export function PdfFileViewer({ entry, onClose }: FileViewerProps) {
     return () => observer.disconnect();
   }, [measureFitWidth]);
 
-  // After pages reflow to a new committed scale, restore the zoom anchor.
+  // Keep scroll anchored after pages resize to the committed scale.
   useEffect(() => {
     const pages = pagesRef.current;
     const scroller = bodyRef.current;
@@ -324,7 +325,7 @@ export function PdfFileViewer({ entry, onClose }: FileViewerProps) {
       pinchRef.current = {
         distance: touchDistance(a, b),
         scale: base,
-        // Scroll-content coords under the pinch midpoint.
+        // Content coords under the pinch midpoint.
         originX: node.scrollLeft + (center.x - rect.left),
         originY: node.scrollTop + (center.y - rect.top),
       };
@@ -346,12 +347,12 @@ export function PdfFileViewer({ entry, onClose }: FileViewerProps) {
       const rect = node.getBoundingClientRect();
       const pages = pagesRef.current;
       if (pages) {
-        // Scale around the original pinch point in content space.
+        // Scale around the original pinch point.
         pages.style.transformOrigin = `${pinch.originX}px ${pinch.originY}px`;
         pages.style.transform = `scale(${next / scale})`;
       }
 
-      // Keep that content point under the (possibly moving) finger midpoint.
+      // Keep that point under the finger midpoint.
       node.scrollLeft = pinch.originX - (center.x - rect.left);
       node.scrollTop = pinch.originY - (center.y - rect.top);
     };
@@ -376,8 +377,7 @@ export function PdfFileViewer({ entry, onClose }: FileViewerProps) {
 
       scaleModeRef.current = 'custom';
       const rect = node.getBoundingClientRect();
-      // After live transform clears, map the pinch content point into the viewport
-      // and re-anchor once pages re-render at the committed scale.
+      // Anchor scroll to the pinch point after the real scale commits.
       const clientX = rect.left + (pinch.originX - node.scrollLeft);
       const clientY = rect.top + (pinch.originY - node.scrollTop);
       pendingScrollAnchorRef.current = {
@@ -421,25 +421,23 @@ export function PdfFileViewer({ entry, onClose }: FileViewerProps) {
                 <span className="file-viewer-format">{entry.format}</span>
               ) : null}
             </div>
-            <button
-              type="button"
+            <IconButton
+              label="Close"
               className="file-viewer-close"
-              aria-label="Close"
               onClick={onClose}
             >
               ✕
-            </button>
+            </IconButton>
           </div>
           <div className="file-viewer-actions">
-            <button
-              type="button"
+            <IconButton
+              label="Zoom out"
               className="file-viewer-tool"
-              aria-label="Zoom out"
               disabled={!pdf}
               onClick={() => zoomBy(1 / ZOOM_STEP)}
             >
               −
-            </button>
+            </IconButton>
             <button
               type="button"
               className="file-viewer-tool file-viewer-zoom-label"
@@ -450,15 +448,14 @@ export function PdfFileViewer({ entry, onClose }: FileViewerProps) {
             >
               {Math.round(displayScale * 100)}%
             </button>
-            <button
-              type="button"
+            <IconButton
+              label="Zoom in"
               className="file-viewer-tool"
-              aria-label="Zoom in"
               disabled={!pdf}
               onClick={() => zoomBy(ZOOM_STEP)}
             >
               +
-            </button>
+            </IconButton>
             <button
               type="button"
               className="file-viewer-tool"

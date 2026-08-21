@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { MediaMetadata } from '../types';
+import { Button } from '../ui';
 import {
   getCachedMediaMetadata,
   loadMediaMetadata,
@@ -220,9 +221,9 @@ export function MediaDetailsPanel({
       <div className="image-details-header">
         <h2>Details</h2>
         {onClose ? (
-          <button type="button" className="secondary" onClick={onClose}>
+          <Button variant="secondary" size="sm" onClick={onClose}>
             Close
-          </button>
+          </Button>
         ) : null}
       </div>
 

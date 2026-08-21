@@ -1,3 +1,5 @@
+import { Button } from '../../ui';
+
 interface AdminPaginationProps {
   page: number;
   pageSize: number;
@@ -44,25 +46,27 @@ export function AdminPagination({
             </select>
           </label>
         ) : null}
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           className="admin-page-btn"
           disabled={safePage <= 1}
           onClick={() => onPageChange(safePage - 1)}
         >
           Previous
-        </button>
+        </Button>
         <span className="admin-page-indicator">
           Page {safePage} / {pageCount}
         </span>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           className="admin-page-btn"
           disabled={safePage >= pageCount}
           onClick={() => onPageChange(safePage + 1)}
         >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   );

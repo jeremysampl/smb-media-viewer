@@ -17,7 +17,7 @@ interface VirtualFileGridProps {
   entries: BrowseEntry[];
   isMobile: boolean;
   mobileColumns: number;
-  /** Live pinch gesture — use a small CSS flex preview instead of reflowing the virtualizer. */
+  /** During pinch, show a CSS flex preview instead of reflowing the virtualizer. */
   isPinching?: boolean;
   showGridDetails: boolean;
   className?: string;

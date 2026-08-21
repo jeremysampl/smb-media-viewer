@@ -126,7 +126,7 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
     );
 
     // Re-index when missing/stale, thumb missing, or capture parsing version changed.
-    // Do not treat a null captureTime alone as pending — some files have no date.
+    // A null captureTime alone is not "pending"; some files have no date.
     if (!fresh || !hasThumb || !metaCurrent) {
       staleJobs.push({
         absolutePath: file.absoluteEntryPath,

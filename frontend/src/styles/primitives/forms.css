@@ -1,0 +1,27 @@
+label {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-soft);
+}
+
+input,
+select {
+  font: inherit;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: inherit;
+  padding: var(--control-pad-y) var(--control-pad-x);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+input:disabled,
+select:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

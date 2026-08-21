@@ -1,0 +1,484 @@
+.gallery-toolbar-quality {
+  display: inline-flex;
+  align-items: center;
+}
+
+.gallery-toolbar-quality select {
+  min-width: 0;
+  max-width: 9rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--color-surface-3);
+  color: inherit;
+}
+
+.yarl__button_zoom_in,
+.yarl__button_zoom_out {
+  display: none !important;
+}
+
+.mobile-gallery {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-gallery);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.mobile-gallery-backdrop {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  transition: opacity var(--duration-slow) var(--ease-soft);
+}
+
+.mobile-gallery-backdrop-opening {
+  animation: backdrop-in var(--duration-slow) var(--ease-soft) forwards;
+}
+
+.mobile-gallery-chrome {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: max(0.75rem, env(safe-area-inset-top))
+    max(0.85rem, env(safe-area-inset-right)) 0.5rem
+    max(0.85rem, env(safe-area-inset-left));
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent);
+  transition: opacity var(--duration) ease, transform var(--duration) ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mobile-gallery-chrome.hidden {
+  opacity: 0;
+  transform: translateY(-12px);
+  pointer-events: none;
+}
+
+.mobile-gallery-back,
+.mobile-gallery-details-btn {
+  box-sizing: border-box;
+  width: 2.6rem;
+  height: 2.6rem;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--color-shadow-strong);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-gallery-back span,
+.mobile-gallery-details-btn span {
+  display: block;
+  line-height: 1;
+  font-size: 1.35rem;
+  transform: translateY(-0.04em);
+}
+
+.mobile-gallery-details-btn span {
+  font-size: 1.2rem;
+  transform: none;
+}
+
+.mobile-gallery-details-btn.active {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.mobile-gallery-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mobile-gallery-quality select {
+  min-width: 0;
+  max-width: 8rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--color-surface-3);
+  color: inherit;
+}
+
+.mobile-gallery-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--details-sheet-height, 0px);
+  overflow: hidden;
+  z-index: 1;
+  min-height: 0;
+  transition: bottom 320ms cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.mobile-gallery.sheet-dragging .mobile-gallery-stage,
+.mobile-gallery.sheet-dragging .mobile-gallery-details-sheet {
+  transition: none;
+}
+
+.mobile-gallery-details-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  height: var(--details-sheet-height, 0px);
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(10, 14, 20, 0.96);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px 16px 0 0;
+  transition: height 320ms cubic-bezier(0.33, 1, 0.68, 1);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mobile-gallery-details-sheet.visible {
+  pointer-events: auto;
+}
+
+@media (min-width: 768px) {
+  .image-details-panel-sheet {
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+  }
+
+  .image-details-panel-sheet .image-details-list {
+    max-width: 920px;
+    margin-inline: auto;
+    grid-template-columns: minmax(6.5rem, 28%) 1fr minmax(6.5rem, 28%) 1fr;
+    column-gap: 1.5rem;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 700px) {
+  .mobile-gallery-chrome {
+    padding-left: max(0.85rem, env(safe-area-inset-left));
+    padding-right: max(0.85rem, env(safe-area-inset-right));
+  }
+}
+
+.mobile-gallery-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  will-change: transform;
+}
+
+.mobile-gallery-slide-item {
+  position: absolute;
+  top: 0;
+  box-sizing: border-box;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: stretch;
+  overflow: hidden;
+  transform-origin: center center;
+}
+
+.mobile-gallery-slide-item.hidden {
+  opacity: 0;
+}
+
+.mobile-gallery-slide {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  will-change: transform;
+}
+
+.mobile-gallery-track.hidden {
+  opacity: 0;
+}
+
+.mobile-gallery-flyout {
+  position: fixed;
+  z-index: 10002;
+  overflow: hidden;
+  pointer-events: none;
+  background: #000;
+  transition:
+    left var(--duration-slow) var(--ease-soft),
+    top var(--duration-slow) var(--ease-soft),
+    width var(--duration-slow) var(--ease-soft),
+    height var(--duration-slow) var(--ease-soft),
+    border-radius var(--duration-slow) var(--ease-soft);
+}
+
+.mobile-gallery-flyout-media {
+  width: 100%;
+  height: 100%;
+  /* Match grid thumbs (cover/center crop) while the frame morphs to/from the square. */
+  object-fit: cover;
+  object-position: center center;
+  display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
+.mobile-gallery-media {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+  object-position: center center;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  transform-origin: center center;
+  touch-action: none;
+}
+
+/* Immich-style Chromium seam workaround shell (see chromeImageRaster.ts). */
+.chrome-raster-shell {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+  transform-origin: center center;
+  touch-action: none;
+}
+
+.chrome-raster-shell--fill {
+  width: 100%;
+  height: 100%;
+}
+
+.chrome-raster-shell--contain {
+  /* Width/height set inline to the contain-fit box for YARL flex centering. */
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.chrome-raster-layer {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.chrome-raster-layer.is-placed,
+.chrome-raster-layer.is-rasterized {
+  display: block;
+  place-items: unset;
+}
+
+.chrome-raster-layer.is-placed .mobile-gallery-media,
+.chrome-raster-layer.is-placed .yarl__slide_image,
+.chrome-raster-layer.is-rasterized .mobile-gallery-media,
+.chrome-raster-layer.is-rasterized .yarl__slide_image {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+}
+
+/* Decode the next quality off-screen; swap in only after onLoad. */
+.chrome-raster-pending {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: fill;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mobile-gallery-video {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
+  object-position: center center;
+}
+
+.mobile-gallery-video-frame {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: #000;
+  transform-origin: center center;
+  will-change: transform;
+  touch-action: none;
+}
+
+.mobile-gallery-video-poster,
+.mobile-gallery-video-player {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  display: block;
+}
+
+.mobile-gallery-video-poster {
+  z-index: 1;
+}
+
+.mobile-gallery-video-poster.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.mobile-gallery-video-player {
+  z-index: 2;
+  opacity: 0;
+  background: #000;
+}
+
+.mobile-gallery-video-player.ready {
+  opacity: 1;
+}
+
+.mobile-gallery.closing .mobile-gallery-chrome {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.image-details-panel {
+  position: fixed;
+  top: 4.5rem;
+  right: 1rem;
+  bottom: 1rem;
+  width: min(360px, calc(100vw - 2rem));
+  z-index: 10001;
+  overflow: auto;
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  background: rgba(10, 14, 20, 0.94);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 20px 50px var(--color-shadow-strong);
+}
+
+.image-details-panel-sheet {
+  position: relative;
+  inset: auto;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  width: 100%;
+  height: 100%;
+  z-index: auto;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 0.35rem 1rem max(1rem, env(safe-area-inset-bottom));
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.image-details-sheet-handle {
+  width: 2.5rem;
+  height: 0.28rem;
+  margin: 0.2rem auto 0.65rem;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.image-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.image-details-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.image-details-list {
+  display: grid;
+  grid-template-columns: minmax(6rem, 38%) 1fr;
+  gap: 0.55rem 0.75rem;
+  margin: 0;
+}
+
+.image-details-list dt {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.image-details-list dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.image-details-list a {
+  color: var(--color-accent-soft);
+}
+
+@media (max-width: 720px) {
+  .yarl__navigation_prev,
+  .yarl__navigation_next {
+    display: none !important;
+  }
+
+  .image-details-panel:not(.image-details-panel-sheet) {
+    top: auto;
+    right: 0.75rem;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    width: auto;
+    max-height: 55vh;
+  }
+}
+

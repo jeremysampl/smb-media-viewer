@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import type { QualityProfile, QualityTier } from '../types';
+import { Button } from '../ui';
 
 interface DownloadDialogProps {
   open: boolean;
@@ -80,16 +81,15 @@ export function DownloadDialog({
         {error ? <p className="error">{error}</p> : null}
 
         <div className="modal-actions">
-          <button type="button" className="secondary" onClick={onClose} disabled={busy}>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             disabled={busy || !zipName.trim()}
             onClick={() => onConfirm(zipName.trim(), downloadQuality)}
           >
             {busy ? 'Preparing…' : 'Download zip'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

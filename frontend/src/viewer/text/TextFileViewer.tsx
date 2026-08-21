@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchRawText } from '../../api/client';
+import { IconButton } from '../../ui';
 import type { FileViewerProps } from '../types';
 
 export function TextFileViewer({ entry, onClose }: FileViewerProps) {
@@ -48,14 +49,13 @@ export function TextFileViewer({ entry, onClose }: FileViewerProps) {
               <span className="file-viewer-format">{entry.format}</span>
             ) : null}
           </div>
-          <button
-            type="button"
+          <IconButton
+            label="Close"
             className="file-viewer-close"
-            aria-label="Close"
             onClick={onClose}
           >
             ✕
-          </button>
+          </IconButton>
         </header>
         <div className="file-viewer-body">
           {loading ? <p className="file-viewer-status">Loading…</p> : null}

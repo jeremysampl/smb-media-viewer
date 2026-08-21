@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Button } from '../ui';
 import { useAuth } from './AuthContext';
 
 export function LoginPage() {
@@ -53,9 +54,9 @@ export function LoginPage() {
           />
         </label>
         {error ? <p className="error">{error}</p> : null}
-        <button type="submit" disabled={submitting}>
+        <Button type="submit" disabled={submitting}>
           {submitting ? 'Signing in...' : 'Sign in'}
-        </button>
+        </Button>
       </form>
     </div>
   );

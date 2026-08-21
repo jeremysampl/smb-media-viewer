@@ -1,10 +1,12 @@
+import { Button } from '../../ui';
+
 interface AdminBulkBarProps {
   selectedCount: number;
   folder: string;
   busy?: boolean;
-  onClearSelected: () => void;
-  onClearFolder: () => void;
-  onClearAll: () => void;
+  onClearSelected: () => void | Promise<unknown>;
+  onClearFolder: () => void | Promise<unknown>;
+  onClearAll: () => void | Promise<unknown>;
   entityLabel: string;
 }
 
@@ -21,16 +23,18 @@ export function AdminBulkBar({
 
   return (
     <div className="admin-bulk-bar" role="group" aria-label={`${entityLabel} clear actions`}>
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
         className="admin-bulk-btn"
         disabled={busy || selectedCount === 0}
         onClick={onClearSelected}
       >
         Clear selected ({selectedCount})
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
         className="admin-bulk-btn"
         disabled={busy || !folderReady}
         title={
@@ -41,15 +45,16 @@ export function AdminBulkBar({
         onClick={onClearFolder}
       >
         Clear folder filter
-      </button>
-      <button
-        type="button"
-        className="admin-bulk-btn danger"
+      </Button>
+      <Button
+        variant="danger"
+        size="sm"
+        className="admin-bulk-btn"
         disabled={busy}
         onClick={onClearAll}
       >
         Clear all {entityLabel}
-      </button>
+      </Button>
     </div>
   );
 }

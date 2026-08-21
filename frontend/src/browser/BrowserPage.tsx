@@ -24,6 +24,7 @@ import { EntryContextMenu, type ContextMenuState } from './EntryContextMenu';
 import { UserMenu } from './UserMenu';
 import { formatDuration, formatEntryMeta } from './formatters';
 import { sortEntries } from './sortEntries';
+import { Button } from '../ui';
 import {
   gapForColumns,
   paddingForColumns,
@@ -488,14 +489,15 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
             Still reading media info for this folder. Date order may shift until
             that finishes{sort === 'date_desc' || sort === 'date_asc' ? ' (especially with date sort)' : ''}.
           </p>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             className="index-snackbar-dismiss"
             aria-label="Dismiss"
             onClick={() => setIndexBannerDismissed(true)}
           >
             Dismiss
-          </button>
+          </Button>
         </div>
       ) : null}
 

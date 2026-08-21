@@ -1,0 +1,741 @@
+.admin-page {
+  max-width: var(--admin-max);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6) var(--space-9);
+}
+
+@media (max-width: 600px) {
+  .admin-page {
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+    padding-left: max(0.35rem, env(safe-area-inset-left));
+    padding-right: max(0.35rem, env(safe-area-inset-right));
+  }
+}
+
+.admin-eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 0.85rem;
+}
+
+.admin-eyebrow a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.admin-eyebrow a:hover {
+  color: #c9dbff;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 800px) {
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-card {
+  padding: 1.1rem 1.15rem 1.2rem;
+  border-radius: 16px;
+  border: 1px solid var(--color-border-soft);
+  background: rgba(20, 28, 40, 0.88);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+}
+
+.admin-card-wide {
+  grid-column: 1 / -1;
+}
+
+.admin-card h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.admin-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.admin-card-header h2 {
+  margin: 0;
+}
+
+.admin-segmented {
+  display: inline-flex;
+  padding: 0.2rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(12, 18, 28, 0.75);
+}
+
+.admin-segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.admin-segmented button.active {
+  background: var(--color-accent-fill);
+  color: var(--color-text-strong);
+}
+
+.admin-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.35rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-soft);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-segmented button.active .admin-count {
+  background: var(--color-border-strong);
+}
+
+.admin-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-chip {
+  margin: 0;
+  padding: 0.28rem 0.65rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.admin-chip.active {
+  border-color: rgba(142, 181, 255, 0.45);
+  background: rgba(61, 123, 255, 0.16);
+  color: var(--color-text);
+}
+
+.admin-filter-note {
+  margin-left: 0.25rem;
+  color: #f0a8a8;
+  font-size: 0.78rem;
+}
+
+.admin-job-badge.completed,
+.admin-job-badge.done {
+  background: rgba(56, 168, 110, 0.22);
+  color: #b6f0cc;
+}
+
+.admin-job-badge.failed {
+  background: rgba(220, 80, 80, 0.22);
+  color: #ffc4c4;
+}
+
+.admin-job-list li.failed {
+  border-color: rgba(220, 80, 80, 0.22);
+}
+
+.admin-job-error {
+  margin: 0.35rem 0 0;
+  color: #ffb4b4;
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+
+.admin-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.65rem 1rem;
+  margin: 0.85rem 0 0;
+}
+
+.admin-metric {
+  margin: 0;
+}
+
+.admin-metric dt {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-metric dd {
+  margin: 0.15rem 0 0;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+.admin-progress {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.55rem;
+}
+
+.admin-progress-track {
+  position: relative;
+  height: 0.55rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-soft);
+}
+
+.admin-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-accent), #6ea0ff);
+  transition: width 400ms ease;
+}
+
+.admin-progress-indeterminate {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 35%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+  animation: progress-slide 1.2s ease-in-out infinite;
+}
+
+.admin-progress-label {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-empty {
+  margin: 0.4rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.admin-job-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.admin-job-list li {
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius-md);
+  background: rgba(12, 18, 28, 0.65);
+  border: 1px solid var(--color-border-faint);
+}
+
+.admin-job-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.4rem 0.65rem;
+  min-width: 0;
+}
+
+.admin-job-badge {
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.7rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-job-badge.active {
+  background: var(--color-accent-fill);
+  color: #c9dbff;
+}
+
+.admin-job-badge.queued {
+  background: var(--color-border-soft);
+  color: var(--color-text-muted);
+}
+
+.admin-job-kind {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+  color: var(--color-text-soft);
+  font-size: 0.8rem;
+}
+
+.admin-job-file {
+  position: relative;
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+
+.admin-job-file-trigger {
+  display: grid;
+  gap: 0.1rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.15rem 0.35rem;
+  border: 1px dashed transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-job-file-trigger:hover,
+.admin-job-file.open .admin-job-file-trigger {
+  border-color: var(--color-border-accent);
+  background: rgba(61, 123, 255, 0.1);
+}
+
+.admin-job-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.admin-job-folder {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  direction: rtl;
+  text-align: left;
+}
+
+.admin-job-meta {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-job-hover-card {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.65rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: rgba(12, 18, 28, 0.98);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.admin-job-preview-media {
+  overflow: hidden;
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-job-preview-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-job-preview-fallback {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 0.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.admin-job-preview-meta {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.admin-job-preview-name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  word-break: break-word;
+}
+
+.admin-job-preview-path {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  word-break: break-all;
+}
+
+.admin-job-preview-size {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-job-copy,
+.admin-job-sheet-close {
+  justify-self: start;
+  margin-top: 0.25rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: rgba(61, 123, 255, 0.16);
+  color: var(--color-text);
+  font-size: 0.8rem;
+}
+
+.admin-job-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  align-items: end;
+}
+
+.admin-job-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.admin-job-sheet {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.75rem;
+  max-height: min(85vh, 36rem);
+  overflow: auto;
+  padding: 0.65rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  border-radius: var(--radius-xl) 18px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  background: var(--color-bg-elevated);
+  box-shadow: 0 -12px 40px var(--color-shadow-strong);
+}
+
+.admin-job-sheet-handle {
+  width: 2.5rem;
+  height: 0.3rem;
+  margin: 0.15rem auto 0.25rem;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.admin-job-sheet .admin-job-preview-media {
+  width: min(100%, 16rem);
+  margin: 0 auto;
+}
+
+.admin-job-sheet-close {
+  width: 100%;
+  justify-self: stretch;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .admin-job-row {
+    align-items: stretch;
+  }
+
+  .admin-job-meta {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .admin-job-kind {
+    margin-top: 0.05rem;
+  }
+}
+
+a.user-menu-item {
+  text-decoration: none;
+  color: inherit;
+}
+
+.admin-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 1rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(12, 18, 28, 0.65);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.admin-section-nav button {
+  margin: 0;
+  padding: 0.45rem 0.9rem;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.admin-section-nav button.active {
+  background: var(--color-accent-fill);
+  color: var(--color-text-strong);
+}
+
+.admin-inline-link {
+  margin-top: 0.85rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #c9dbff;
+  font-size: 0.85rem;
+}
+
+.admin-panel-note {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  max-width: 22rem;
+  text-align: right;
+  line-height: 1.35;
+}
+
+.admin-table-toolbar {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-table-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.55rem;
+}
+
+.admin-table-control {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.admin-table-control-label {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-table-control input,
+.admin-table-control select {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-table-control-wide {
+  grid-column: span 2;
+}
+
+.admin-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.admin-pagination-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+}
+
+.admin-page-btn {
+  margin: 0;
+}
+
+.admin-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-page-indicator {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0 0.25rem 0.45rem;
+}
+
+.admin-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0 0 0.75rem;
+}
+
+.admin-bulk-btn {
+  margin: 0;
+}
+
+.admin-bulk-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.admin-select-col {
+  width: 2.2rem;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.admin-select-col input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--color-accent);
+}
+
+@media (max-width: 800px) {
+  .admin-table-control-wide {
+    grid-column: span 1;
+  }
+}
+
+.admin-table-count {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.admin-data-table-wrap {
+  overflow: auto;
+  max-height: min(70vh, 40rem);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-soft);
+}
+
+.admin-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.admin-data-table th,
+.admin-data-table td {
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--color-border-faint);
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-data-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #152033;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-data-table .is-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-data-table tr.failed {
+  background: rgba(220, 80, 80, 0.08);
+}
+
+.admin-row-extra td {
+  padding-top: 0;
+  border-bottom-color: var(--color-border-faint);
+}
+
+@media (max-width: 800px) {
+  .hide-below-tablet {
+    display: none;
+  }
+
+  .admin-panel-note {
+    text-align: left;
+    max-width: none;
+  }
+
+  .admin-section-nav {
+    width: 100%;
+  }
+}
+
+.admin-data-table td.admin-cell-primary,
+.admin-job-label,
+.admin-job-folder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 18rem;
+}
+
+@media (max-width: 600px) {
+  .admin-page {
+    padding-left: max(var(--space-2), env(safe-area-inset-left));
+    padding-right: max(var(--space-2), env(safe-area-inset-right));
+  }
+
+  .admin-bulk-bar,
+  .admin-table-toolbar,
+  .admin-section-nav {
+    flex-wrap: wrap;
+  }
+
+  .admin-bulk-btn,
+  .admin-page-btn,
+  .admin-chip {
+    min-height: var(--control-h-md);
+  }
+}
