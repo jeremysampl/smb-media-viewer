@@ -15,11 +15,19 @@ function requireEnv(name: string, fallback?: string): string {
 
 const frontendOrigin = process.env.FRONTEND_ORIGIN ?? 'http://localhost:5173';
 
-/** Secure cookies only work over HTTPS. LAN HTTP installs must leave this false. */
+/** Secure cookies need HTTPS. Leave false for plain HTTP on the LAN. */
 function resolveCookieSecure(origin: string): boolean {
   if (process.env.COOKIE_SECURE === 'true') return true;
   if (process.env.COOKIE_SECURE === 'false') return false;
   return origin.startsWith('https://');
+}
+
+function parseAdminUsers(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
 }
 
 export const config = {
@@ -28,6 +36,8 @@ export const config = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '8h',
   cookieName: process.env.COOKIE_NAME ?? 'smb_media_token',
   cookieSecure: resolveCookieSecure(frontendOrigin),
+  /** From ADMIN_USERS (comma-separated Samba usernames). */
+  adminUsers: parseAdminUsers(process.env.ADMIN_USERS),
   localDev: process.env.LOCAL_DEV === 'true',
   devShareName: process.env.DEV_SHARE_NAME ?? 'media',
   devMediaRoot: process.env.DEV_MEDIA_ROOT ?? path.join(process.cwd(), 'dev-media'),
@@ -39,12 +49,9 @@ export const config = {
   cacheDir: path.resolve(process.env.CACHE_DIR ?? path.join(process.cwd(), 'cache')),
   cacheMaxBytes: Number(process.env.CACHE_MAX_BYTES ?? 10 * 1024 * 1024 * 1024),
   cacheCleanupCron: process.env.CACHE_CLEANUP_CRON ?? '0 */6 * * *',
-  /** Permanent SQLite metadata + tiny grid thumbs/posters (not evicted). */
+  /** Index DB + grid thumbs (kept permanently). */
   indexDir: path.resolve(process.env.INDEX_DIR ?? path.join(process.cwd(), 'index')),
-  /**
-   * Max concurrent heavy index jobs (EXIF/ffprobe + thumb/poster generation).
-   * Shared by background indexing and on-demand /image|/poster requests.
-   */
+  /** Max concurrent index/thumb jobs (shared by background + on-demand). */
   indexConcurrency: Math.max(1, Number(process.env.INDEX_CONCURRENCY ?? 2)),
   tokenSecret: requireEnv('TOKEN_SECRET', 'change-me-token-secret'),
   frontendOrigin,

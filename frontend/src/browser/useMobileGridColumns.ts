@@ -11,7 +11,7 @@ export const MIN_GRID_COLUMNS = 2;
 export const MAX_GRID_COLUMNS = 12;
 export const DEFAULT_GRID_COLUMNS = 3;
 
-/** Prefer thumbs around this size; landscape uses a slightly tighter target. */
+/** Target thumb size; landscape uses a slightly tighter value. */
 const TARGET_THUMB_PORTRAIT_PX = 118;
 const TARGET_THUMB_LANDSCAPE_PX = 112;
 
@@ -135,7 +135,7 @@ export function useMobileGridColumns(enabled: boolean) {
     const grid = element ?? gridEl;
     if (!grid) return;
     const clamped = clampColumns(next);
-    // Integer string — required for CSS repeat(var(--cols), …).
+    // Needs an integer string for CSS repeat(var(--cols), ...).
     grid.style.setProperty('--cols', String(Math.round(clamped * 1000) / 1000));
     grid.style.setProperty('--gap', `${gapForColumns(clamped)}px`);
     grid.style.setProperty('--card-padding', `${paddingForColumns(clamped)}rem`);

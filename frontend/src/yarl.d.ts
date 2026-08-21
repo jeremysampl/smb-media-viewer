@@ -6,7 +6,7 @@ declare module 'yet-another-react-lightbox' {
   }
 
   interface SlideImage {
-    /** Browse entry path — stable across quality URL changes. */
+    /** Browse entry path; stays stable when quality URLs change. */
     entryPath?: string;
   }
 }

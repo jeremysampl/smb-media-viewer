@@ -8,9 +8,9 @@ interface MobileGalleryVideoSlideProps {
   isNearby: boolean;
   quality: QualityTier;
   controlsVisible: boolean;
-  /** Already-cached grid thumb/poster for adjacent slides (no full video fetch). */
+  /** Grid thumb/poster for adjacent slides (no full video fetch). */
   previewSrc?: string;
-  /** True once this slide has been opened — keeps full media while swiping away. */
+  /** True after open so full media stays loaded while swiping away. */
   loadFullMedia?: boolean;
   style?: CSSProperties;
 }

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import cron from 'node-cron';
 import { config } from '../config.js';
+import { removeCacheEntries } from './meta.js';
 
 interface CacheFile {
   filePath: string;
@@ -20,12 +21,14 @@ async function walkFiles(dir: string): Promise<CacheFile[]> {
   }
 
   for (const entry of entries) {
+    if (entry.name.startsWith('cache-meta.db')) continue;
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       results.push(...(await walkFiles(fullPath)));
       continue;
     }
     if (!entry.isFile()) continue;
+    if (entry.name.endsWith('.tmp')) continue;
     try {
       const stats = await fs.stat(fullPath);
       results.push({
@@ -48,15 +51,18 @@ export async function enforceCacheLimit(): Promise<void> {
 
   files.sort((a, b) => a.mtimeMs - b.mtimeMs);
 
+  const removed: string[] = [];
   for (const file of files) {
     if (total <= config.cacheMaxBytes) break;
     try {
       await fs.unlink(file.filePath);
       total -= file.size;
+      removed.push(file.filePath);
     } catch {
       // ignore
     }
   }
+  removeCacheEntries(removed);
 }
 
 export function startCacheCleanupJob(): void {

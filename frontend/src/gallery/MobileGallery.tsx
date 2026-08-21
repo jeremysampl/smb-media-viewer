@@ -155,7 +155,7 @@ function buildFlyoutLayer(
   _quality: QualityTier,
 ): FlyoutLayer | null {
   if (!entry.token) return null;
-  // Always morph with a cached still (thumb/poster) via <img> — avoids empty/unload
+  // Morph with a cached thumb/poster <img> so we never animate an empty/unloaded
   // full-res frames and broken <video src=poster> during the open animation.
   const src =
     entry.type === 'video'
@@ -172,7 +172,7 @@ function stageFlyoutRect(
   if (!rect || rect.width <= 0 || rect.height <= 0) {
     return viewportFlyoutRect();
   }
-  // Prefer the object-fit:contain paint box so open ends on the same framing
+  // Use the object-fit:contain paint box so open ends on the same framing
   // the gallery uses (then cover on a matching-aspect frame is a no-op crop).
   const natural = mediaPath ? getThumbnailNaturalSize(mediaPath) : null;
   if (natural) {
@@ -375,7 +375,7 @@ export function MobileGallery({
         return;
       }
 
-      // Same cached thumb/poster as open — avoid first-close jank from decoding
+      // Reuse the same thumb/poster as open to avoid decode jank on first close
       // a fresh full-quality <img>/<video> mid-animation.
       const closingLayer = buildFlyoutLayer(
         entry,
@@ -492,7 +492,7 @@ export function MobileGallery({
     let openTimer: number | undefined;
     const raf = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        // Don't measure the underlying <img> — it may still be unloaded (0×0)
+        // Don't measure the underlying <img>; it may still be unloaded (0x0)
         // which made the flyout animate toward a tiny rect (looked like zooming out).
         // Target the contain paint box (via thumb natural size) so cover matches.
         const targetRect = stageFlyoutRect(stageRef.current, entry.path);
@@ -511,7 +511,7 @@ export function MobileGallery({
       cancelAnimationFrame(raf);
       if (openTimer !== undefined) window.clearTimeout(openTimer);
     };
-    // quality intentionally omitted — changing quality must not reset to initialIndex.
+    // Omit quality from deps so changing it does not reset to initialIndex.
   }, [open, initialIndex, mediaEntries, updateMetrics, resetImageZoom]);
 
   useEffect(() => {

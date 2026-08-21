@@ -1,15 +1,13 @@
 /**
- * Chromium rasterizes large/HDR images as a grid of GPU tiles. CSS zoom then
- * reveals seam lines between those tiles (https://issues.chromium.org/issues/40084005).
+ * Chromium paints large/HDR images as GPU tiles; CSS zoom can show seams between
+ * them (https://issues.chromium.org/issues/40084005).
  *
- * Immich workaround (immich-app/immich#27715): pre-scale a `will-change: transform`
- * layer toward native resolution (GPU budget capped), then counter-scale so the
- * frozen texture stays sharp under CSS zoom.
+ * Same idea as Immich (immich-app/immich#27715): pre-scale under a will-change
+ * layer (capped GPU budget), then counter-scale so zoom stays sharp.
  *
- * Mobile: modest budget + only while zoomed (avoids black tile dropouts).
- * Desktop: Immich-like budget at rest (seams show even at 1× in YARL).
- *
- * Firefox/Safari skip this path.
+ * Mobile: smaller budget, and only while zoomed.
+ * Desktop: larger budget even at rest (YARL still seams at 1x).
+ * Skip on Firefox/Safari.
  */
 
 let cachedMaxRasterPixels: { mobile: number; desktop: number } | undefined;
@@ -78,9 +76,9 @@ export interface ChromeRasterLayout {
 
 export interface ComputeChromeRasterOptions {
   variant?: ChromeRasterVariant;
-  /** When true, offsets are 0 (shell is already the display box — YARL flex-centers it). */
+  /** Offsets stay 0 when the shell is already the display box. */
   shellIsDisplayBox?: boolean;
-  /** Place the contain-fit box only — skip native pre-scale (stable mobile geometry at rest). */
+  /** Contain-fit only; skip native pre-scale so mobile layout stays stable at rest. */
   forceDisplayOnly?: boolean;
 }
 

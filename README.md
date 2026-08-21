@@ -195,7 +195,8 @@ Vite proxies `/api` to `http://localhost:3001`.
 ## API overview
 
 - `POST /api/auth/login` - Samba credential check, sets httpOnly session cookie
-- `GET /api/auth/me` - Current user
+- `GET /api/auth/me` - Current user (`username`, `admin`)
+- `GET /api/admin/status` - Admin-only live jobs + host/process metrics
 - `GET /api/shares` - Top-level accessible shares
 - `GET /api/browse?path=ShareName/folder` - Folder listing
 - `GET /api/media/:token/image?quality=medium` - Resized image
@@ -204,9 +205,12 @@ Vite proxies `/api` to `http://localhost:3001`.
 
 Media tokens are signed and scoped to the authenticated user.
 
+Set `ADMIN_USERS=alice,bob` (Samba usernames, comma-separated) to enable `/admin`. Those users see an **Admin** item in the account menu with Overview, Jobs, Cache, and Index panels (paginated, sortable/filterable tables, including folder filters). Cache and Index support clearing selected rows, everything under a folder filter, or the entire store. Cache open counts and last-opened times are tracked whenever a cached image/video is served.
+
 ## Security notes
 
 - Change default secrets before production use.
+- Restrict `/admin` with `ADMIN_USERS` (Samba usernames). Leave unset to disable the dashboard.
 - Backend uses `network_mode: host` so it can reach the native Samba daemon on port 445.
 - Share access is enforced using Samba ACLs from `smb.conf` (share-level in v1).
 - Paths outside allowed shares return 404 to avoid leaking filesystem layout.
@@ -221,7 +225,7 @@ Media tokens are signed and scoped to the authenticated user.
   1. On the NAS, run `testparm -s` and confirm share sections + `path =` lines.
   2. Confirm compose mounts the **whole** `/etc/samba` directory (not only `smb.conf`) and `/etc/passwd` + `/etc/group`.
   3. Confirm each share `path` exists in the container (usually via `/srv:/srv:ro`). Example check: `docker exec smb-media-viewer-backend ls /srv`
-  4. Check backend logs: `docker logs smb-media-viewer-backend 2>&1 | grep shares` — you should see `Loaded N share(s)`. If N>0 but the UI is empty, the user failed the `valid users` / group ACL filter (primary group `@users` is now supported).
+  4. Check backend logs: `docker logs smb-media-viewer-backend 2>&1 | grep shares`: you should see `Loaded N share(s)`. If N>0 but the UI is empty, the user failed the `valid users` / group ACL filter (primary group `@users` is now supported).
 - **Shares appear but folders look empty / Path not found**: the `path =` in Samba does not match a mounted host directory inside the container. Align volume mounts with `testparm -s` paths.
 - **Login fails for valid users**: confirm `smbclient` works on the host and `SMB_HOST` is reachable from the backend container (`127.0.0.1` with host networking).
 - **Videos won't play**: first view triggers ffmpeg transcode; wait for cache generation or try a lower quality tier.

@@ -27,7 +27,7 @@ interface FilterGroup {
   options: FilterOption[];
 }
 
-/** Canonical format token → accepted BrowseEntry.format values (uppercase). */
+/** Format alias -> BrowseEntry.format values (uppercase). */
 const FORMAT_ALIASES: Record<string, string[]> = {
   jpeg: ['JPG', 'JPEG'],
   png: ['PNG'],
@@ -222,7 +222,7 @@ export function entryMatchesFileTypeFilter(
   filter: FileTypeFilter,
 ): boolean {
   if (filter === 'any') return true;
-  // Always keep folders so navigation still works while filtering.
+  // Keep folders so you can still navigate while filtering.
   if (entry.type === 'folder') return true;
 
   const format = entryFormat(entry);

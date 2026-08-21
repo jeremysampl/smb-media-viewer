@@ -1,11 +1,13 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 interface UserMenuProps {
   username: string;
   onLogout: () => void | Promise<void>;
+  isAdmin?: boolean;
 }
 
-export function UserMenu({ username, onLogout }: UserMenuProps) {
+export function UserMenu({ username, onLogout, isAdmin = false }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
@@ -57,6 +59,16 @@ export function UserMenu({ username, onLogout }: UserMenuProps) {
 
       {open ? (
         <div className="user-menu-dropdown" id={menuId} role="menu">
+          {isAdmin ? (
+            <Link
+              to="/admin"
+              className="user-menu-item"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+            >
+              Admin
+            </Link>
+          ) : null}
           <button
             type="button"
             className="user-menu-item"

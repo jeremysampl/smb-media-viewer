@@ -4,9 +4,9 @@ import { acquireThumbSlot } from './thumbLoadGate';
 interface LazyThumbnailProps {
   src: string;
   alt: string;
-  /** Extra rows to preload above/below the viewport */
+  /** Extra rows to preload above/below the viewport. */
   bufferRows?: number;
-  /** Change this when grid order/layout changes so visibility is rechecked */
+  /** Bump when grid order/layout changes to recheck visibility. */
   layoutKey?: string | number;
 }
 
@@ -104,7 +104,7 @@ export function LazyThumbnail({
     };
   }, [layoutKey, bufferRows]);
 
-  // Gate in-flight fetches only — release as soon as the image finishes (or cancels).
+  // Hold a slot only while the request is in flight.
   useEffect(() => {
     if (!inView || giveUp || awaitingRetry || loaded) {
       releaseSlot();

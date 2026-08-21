@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { config } from '../config.js';
+import { isAdminUsername } from './admin.js';
 import { verifyAuthToken } from './jwt.js';
 
 export interface AuthenticatedRequest extends Request {
@@ -28,5 +29,19 @@ export function authMiddleware(
   }
 
   req.user = { username: payload.username };
+  next();
+}
+
+/** Call after authMiddleware. 403 if the user is not an admin. */
+export function adminMiddleware(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): void {
+  const username = req.user?.username;
+  if (!username || !isAdminUsername(username)) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
   next();
 }

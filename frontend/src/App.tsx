@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { AdminPage } from './admin/AdminPage';
 import { useAuth } from './auth/AuthContext';
 import { LoginPage } from './auth/LoginPage';
 import { BrowserPage } from './browser/BrowserPage';
@@ -16,7 +17,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { username, logout } = useAuth();
+  const { username, admin, logout } = useAuth();
 
   return (
     <QualityPreferenceProvider>
@@ -26,10 +27,18 @@ export default function App() {
           element={username ? <Navigate to="/" replace /> : <LoginPage />}
         />
         <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/*"
           element={
             <ProtectedRoute>
-              <BrowserPage username={username!} onLogout={logout} />
+              <BrowserPage username={username!} onLogout={logout} isAdmin={admin} />
             </ProtectedRoute>
           }
         />

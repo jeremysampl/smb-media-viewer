@@ -98,9 +98,9 @@ export function DesktopLightbox({
   const { quality, setQuality, profiles } = useQualityPreference();
   const [index, setIndex] = useState(initialIndex);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  /** Paths that have been the active slide — keep full-quality src so swipe-away doesn't swap renderers/src. */
+  /** Paths that were active; keep full-quality src so swiping away doesn't swap renderers. */
   const [hydratedPaths, setHydratedPaths] = useState<Set<string>>(() => new Set());
-  /** Intrinsic sizes keyed by entry path so quality URL changes keep YARL zoom stable. */
+  /** Natural sizes by entry path so quality URL changes keep zoom stable. */
   const [imageSizeByPath, setImageSizeByPath] = useState<
     Record<string, { width: number; height: number }>
   >({});
@@ -157,7 +157,7 @@ export function DesktopLightbox({
       if (entry.type === 'video' && entry.token) {
         return {
           type: 'video' as const,
-          // Only hydrated (visited/current) slides get a video source — neighbors stay poster-only.
+          // Only visited/current slides get a video source; neighbors stay poster-only.
           sources: useFull
             ? [
                 {
@@ -178,13 +178,13 @@ export function DesktopLightbox({
       const size = imageSizeByPath[entry.path];
 
       return {
-        // Same ImageSlide chrome for every offset; only the URL differs until first view.
+        // Same ImageSlide chrome; URL differs until the slide has been viewed.
         src,
         alt: entry.name,
         title: entry.name,
-        // Keep dims across quality URL changes so zoom math doesn't reset.
+        // Keep dims across quality changes so zoom doesn't reset.
         ...(size ? { width: size.width, height: size.height } : {}),
-        // Carried for render.slide → onNaturalSize path keying.
+        // Passed through for onNaturalSize path keying.
         entryPath: entry.path,
       };
     });

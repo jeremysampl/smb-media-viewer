@@ -6,7 +6,7 @@ export async function validateSambaCredentials(
   password: string,
 ): Promise<boolean> {
   if (config.localDev && config.smbHost === 'localhost') {
-    console.warn('[LOCAL_DEV] Skipping Samba auth — any username/password accepted');
+    console.warn('[LOCAL_DEV] Skipping Samba auth; any username/password accepted');
     return Boolean(username && password);
   }
 

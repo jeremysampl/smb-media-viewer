@@ -9,6 +9,8 @@ import {
   writeAtomic,
 } from '../cache/cache.js';
 import { ensureIndexAsset } from '../index/indexer.js';
+import { setTrackedJobOutputSize, withTrackedJob } from '../jobs/tracker.js';
+import { registerCacheEntry, recordCacheAccess } from '../cache/meta.js';
 import { getBrowserNativeImageContentType } from './fileTypes.js';
 
 export async function getResizedImage(
@@ -41,38 +43,72 @@ export async function getResizedImage(
   const cachePath = getCachePath('images', key, '.webp');
   const cached = await readCacheEntry(cachePath);
   if (cached) {
+    let size = stats.size;
+    try {
+      size = (await fs.stat(cachePath)).size;
+    } catch {
+      // keep source size as fallback for meta only
+    }
+    registerCacheEntry({
+      cachePath,
+      sourcePath,
+      kind: 'image',
+      quality,
+      size,
+    });
+    recordCacheAccess(cachePath);
     return { filePath: cached.filePath, contentType: 'image/webp' };
   }
 
-  const profile = getQualityProfile(quality);
-  const resize = profile.imageMaxDimension
-    ? {
-        width: profile.imageMaxDimension,
-        height: profile.imageMaxDimension,
-        fit: 'inside' as const,
-        withoutEnlargement: true,
-      }
-    : null;
+  return withTrackedJob(
+    { kind: 'image_resize', path: sourcePath, size: stats.size, quality },
+    async (jobId) => {
+      const profile = getQualityProfile(quality);
+      const resize = profile.imageMaxDimension
+        ? {
+            width: profile.imageMaxDimension,
+            height: profile.imageMaxDimension,
+            fit: 'inside' as const,
+            withoutEnlargement: true,
+          }
+        : null;
 
-  try {
-    let pipeline = sharp(sourcePath, {
-      failOn: 'none',
-      sequentialRead: false,
-    }).rotate();
-    if (resize) pipeline = pipeline.resize(resize);
-    const buffer = await pipeline.webp({ quality: 82 }).toBuffer();
-    await writeAtomic(cachePath, buffer);
-    return { filePath: cachePath, contentType: 'image/webp' };
-  } catch {
-    let fallback = sharp(sourcePath, {
-      failOn: 'none',
-      sequentialRead: false,
-    });
-    if (resize) fallback = fallback.resize(resize);
-    const buffer = await fallback.webp({ quality: 82 }).toBuffer();
-    await writeAtomic(cachePath, buffer);
-    return { filePath: cachePath, contentType: 'image/webp' };
-  }
+      try {
+        let pipeline = sharp(sourcePath, {
+          failOn: 'none',
+          sequentialRead: false,
+        }).rotate();
+        if (resize) pipeline = pipeline.resize(resize);
+        const buffer = await pipeline.webp({ quality: 82 }).toBuffer();
+        await writeAtomic(cachePath, buffer);
+      } catch {
+        let fallback = sharp(sourcePath, {
+          failOn: 'none',
+          sequentialRead: false,
+        });
+        if (resize) fallback = fallback.resize(resize);
+        const buffer = await fallback.webp({ quality: 82 }).toBuffer();
+        await writeAtomic(cachePath, buffer);
+      }
+
+      try {
+        const outStats = await fs.stat(cachePath);
+        setTrackedJobOutputSize(jobId, outStats.size);
+        registerCacheEntry({
+          cachePath,
+          sourcePath,
+          kind: 'image',
+          quality,
+          size: outStats.size,
+        });
+        recordCacheAccess(cachePath);
+      } catch {
+        // ignore missing output size
+      }
+
+      return { filePath: cachePath, contentType: 'image/webp' };
+    },
+  );
 }
 
 export async function getThumbnailImage(

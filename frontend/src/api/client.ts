@@ -21,7 +21,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export async function login(username: string, password: string): Promise<{ username: string }> {
+export async function login(
+  username: string,
+  password: string,
+): Promise<{ username: string; admin: boolean }> {
   return request('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ username, password }),
@@ -32,8 +35,191 @@ export async function logout(): Promise<void> {
   await request('/auth/logout', { method: 'POST' });
 }
 
-export async function getMe(): Promise<{ username: string }> {
+export async function getMe(): Promise<{ username: string; admin: boolean }> {
   return request('/auth/me');
+}
+
+export interface AdminStatus {
+  generatedAt: number;
+  system: {
+    process: {
+      uptimeSeconds: number;
+      pid: number;
+      memory: {
+        rss: number;
+        heapUsed: number;
+        heapTotal: number;
+        external: number;
+      };
+      cpuPercent: number;
+    };
+    host: {
+      hostname: string;
+      platform: string;
+      uptimeSeconds: number;
+      loadAverage: [number, number, number];
+      cpuCount: number;
+      memory: {
+        total: number;
+        free: number;
+        used: number;
+        usedPercent: number;
+      };
+    };
+  };
+  cache: {
+    usedBytes: number;
+    maxBytes: number;
+    usedPercent: number;
+    fileCount: number;
+    measuredAt: number;
+  };
+  index: {
+    concurrency: number;
+    activeWorkers: number;
+    queued: number;
+    semaphoreActive: number;
+    semaphorePending: number;
+    completed: number;
+    failed: number;
+    progress: number | null;
+    indexedFiles: number;
+    jobs: Array<{
+      path: string;
+      label: string;
+      size: number;
+      kind: 'image' | 'video';
+      priority: 'high' | 'low';
+      status: 'queued' | 'active';
+    }>;
+  };
+  mediaJobs: Array<{
+    id: string;
+    kind: 'image_resize' | 'video_transcode' | 'image_index' | 'video_index';
+    label: string;
+    path: string;
+    size?: number;
+    outputSize?: number;
+    quality?: string;
+    priority?: 'high' | 'low';
+    startedAt: number;
+    progress: number | null;
+  }>;
+  recentJobs: Array<{
+    id: string;
+    kind: 'image_resize' | 'video_transcode' | 'image_index' | 'video_index';
+    label: string;
+    path: string;
+    size?: number;
+    outputSize?: number;
+    quality?: string;
+    priority?: 'high' | 'low';
+    startedAt: number;
+    finishedAt: number;
+    durationMs: number;
+    progress: number | null;
+    outcome: 'completed' | 'failed';
+    error?: string;
+  }>;
+}
+
+export async function getAdminStatus(): Promise<AdminStatus> {
+  return request('/admin/status');
+}
+
+export interface AdminCacheEntry {
+  id: string;
+  cachePath: string;
+  sourcePath: string | null;
+  label: string;
+  kind: 'image' | 'video' | 'unknown';
+  quality: string | null;
+  size: number;
+  createdAt: number;
+  lastAccessAt: number;
+  accessCount: number;
+}
+
+export interface AdminListQuery {
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+  order?: 'asc' | 'desc';
+  search?: string;
+  kind?: string;
+  folder?: string;
+}
+
+function toQueryString(query: AdminListQuery): string {
+  const params = new URLSearchParams();
+  if (query.page) params.set('page', String(query.page));
+  if (query.pageSize) params.set('pageSize', String(query.pageSize));
+  if (query.sort) params.set('sort', query.sort);
+  if (query.order) params.set('order', query.order);
+  if (query.search) params.set('search', query.search);
+  if (query.kind && query.kind !== 'all') params.set('kind', query.kind);
+  if (query.folder) params.set('folder', query.folder);
+  const text = params.toString();
+  return text ? `?${text}` : '';
+}
+
+export async function getAdminCacheEntries(query: AdminListQuery = {}): Promise<{
+  generatedAt: number;
+  page: number;
+  pageSize: number;
+  total: number;
+  folders: string[];
+  entries: AdminCacheEntry[];
+}> {
+  return request(`/admin/cache/entries${toQueryString(query)}`);
+}
+
+export async function clearAdminCache(body: {
+  mode: 'all' | 'ids' | 'folder';
+  ids?: string[];
+  folder?: string;
+}): Promise<{ ok: boolean; deleted: number }> {
+  return request('/admin/cache/clear', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export interface AdminIndexEntry {
+  id: string;
+  path: string;
+  label: string;
+  kind: 'image' | 'video';
+  size: number;
+  mtimeMs: number;
+  captureTime: string | null;
+  duration: number | null;
+  indexedAt: number;
+  hasThumb: boolean;
+}
+
+export async function getAdminIndexEntries(
+  query: AdminListQuery = {},
+): Promise<{
+  generatedAt: number;
+  page: number;
+  pageSize: number;
+  total: number;
+  folders: string[];
+  entries: AdminIndexEntry[];
+}> {
+  return request(`/admin/index/entries${toQueryString(query)}`);
+}
+
+export async function clearAdminIndex(body: {
+  mode: 'all' | 'ids' | 'folder';
+  ids?: string[];
+  folder?: string;
+}): Promise<{ ok: boolean; deleted: number }> {
+  return request('/admin/index/clear', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 export async function getShares(): Promise<BrowseResponse> {
@@ -98,4 +284,3 @@ export async function downloadZip(options: {
   anchor.remove();
   URL.revokeObjectURL(url);
 }
-

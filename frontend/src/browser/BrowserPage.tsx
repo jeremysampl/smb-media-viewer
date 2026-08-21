@@ -31,6 +31,7 @@ import {
 interface BrowserPageProps {
   onLogout: () => Promise<void>;
   username: string;
+  isAdmin?: boolean;
 }
 
 const LONG_PRESS_MS = 480;
@@ -41,7 +42,7 @@ function defaultZipNameForPath(browsePath: string): string {
   return segments.at(-1) || 'Shares';
 }
 
-export function BrowserPage({ onLogout, username }: BrowserPageProps) {
+export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPageProps) {
   const navigate = useNavigate();
   const params = useParams();
   const currentPath = urlSplatToBrowsePath(params['*']);
@@ -71,7 +72,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   const longPressTimerRef = useRef<number | null>(null);
   const longPressOriginRef = useRef<{ x: number; y: number } | null>(null);
   const longPressPathRef = useRef<string | null>(null);
-  /** Only ignore the click that belongs to the long-pressed card, not the next tap. */
+  /** Ignore the click that follows a long-press on that card. */
   const suppressClickPathRef = useRef<string | null>(null);
 
   function navigateToPath(path: string) {
@@ -180,8 +181,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   const sortedEntries = useMemo(() => {
     const filtered = filterEntriesByFileType(entries, fileTypeFilter);
     const dateSort = sort === 'date_asc' || sort === 'date_desc';
-    // While capture times are still filling in, keep date order stable on mtime
-    // so the grid doesn't reshuffle and re-request thumbs.
+    // Freeze date sort on mtime while capture times are still filling in.
     return sortEntries(filtered, sort, {
       preferMtime: dateSort && indexingActive,
     });
@@ -316,8 +316,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
   function openEntry(entry: BrowseEntry) {
     if (shouldSuppressClick()) return;
 
-    // After a long-press, browsers may or may not emit a click on that same card.
-    // Only suppress that card's click — never the next tap on another item.
+    // Long-press may still fire a click on that card; swallow only that one.
     if (suppressClickPathRef.current) {
       const suppressedPath = suppressClickPathRef.current;
       suppressClickPathRef.current = null;
@@ -408,7 +407,7 @@ export function BrowserPage({ onLogout, username }: BrowserPageProps) {
         <div className="top-bar-brand">
           <h1>Media Library</h1>
         </div>
-        <UserMenu username={username} onLogout={onLogout} />
+        <UserMenu username={username} onLogout={onLogout} isAdmin={isAdmin} />
       </header>
 
       <div className="browser-nav-row">
