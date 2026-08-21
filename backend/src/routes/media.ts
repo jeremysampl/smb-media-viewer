@@ -12,16 +12,18 @@ import { getTranscodedVideo } from '../media/video.js';
 import { getMediaMetadata } from '../media/metadata.js';
 import { resolveShareForPath } from '../permissions/resolver.js';
 import {
-  getTextContentType,
+  getViewerContentType,
   getViewerKind,
   isMediaFile,
+  isPdfFile,
   isTextFile,
 } from '../media/fileTypes.js';
 
 const router = Router();
 
-/** Soft cap for in-browser text viewing (bytes). */
+/** Soft caps for in-browser previews (bytes). */
 const TEXT_VIEW_MAX_BYTES = 5 * 1024 * 1024;
+const PDF_VIEW_MAX_BYTES = 80 * 1024 * 1024;
 
 function getTokenParam(value: string | string[]): string {
   return Array.isArray(value) ? value[0] : value;
@@ -129,8 +131,8 @@ router.get('/:token/metadata', async (req: AuthenticatedRequest, res) => {
 });
 
 /**
- * Stream a viewable non-media file (text today; other kinds later).
- * Text previews are capped so huge dumps don't blow up the browser.
+ * Stream a viewable non-media file (text, PDF, …).
+ * Some kinds are size-capped so huge files don't blow up the browser.
  */
 router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
   const sourcePath = await authorizeMedia(req, getTokenParam(req.params.token));
@@ -139,7 +141,8 @@ router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-  const viewer = getViewerKind(path.basename(sourcePath));
+  const basename = path.basename(sourcePath);
+  const viewer = getViewerKind(basename);
   if (!viewer) {
     res.status(400).json({ error: 'This file type cannot be previewed' });
     return;
@@ -163,13 +166,24 @@ router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
         });
         return;
       }
-      res.setHeader('Content-Type', getTextContentType(sourcePath));
-    } else {
-      res.setHeader('Content-Type', 'application/octet-stream');
+    } else if (viewer === 'pdf') {
+      if (!isPdfFile(sourcePath)) {
+        res.status(400).json({ error: 'Not a PDF file' });
+        return;
+      }
+      if (stats.size > PDF_VIEW_MAX_BYTES) {
+        res.status(413).json({
+          error: `PDF is too large to preview (max ${Math.round(PDF_VIEW_MAX_BYTES / (1024 * 1024))} MB)`,
+        });
+        return;
+      }
     }
 
+    res.setHeader('Content-Type', getViewerContentType(basename));
     res.setHeader('Content-Length', String(stats.size));
     res.setHeader('Cache-Control', 'private, max-age=300');
+    // Allow the PDF viewer to fetch this from a blob/print window context.
+    res.setHeader('Content-Disposition', `inline; filename="${basename.replace(/"/g, '')}"`);
     fs.createReadStream(sourcePath).pipe(res);
   } catch (error) {
     console.error('Raw file serve failed:', error);

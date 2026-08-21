@@ -41,7 +41,7 @@ const VIDEO_EXTENSIONS = new Set([
  * Viewer kinds for non-media files. Add a kind here, map extensions below,
  * then register a frontend viewer for that kind.
  */
-export type ViewerKind = 'text';
+export type ViewerKind = 'text' | 'pdf';
 
 const TEXT_CONTENT_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
@@ -91,9 +91,12 @@ const TEXT_CONTENT_TYPES: Record<string, string> = {
 };
 
 /** extension → viewer kind. Grow this map as new viewers ship. */
-const VIEWER_BY_EXTENSION: Record<string, ViewerKind> = Object.fromEntries(
-  Object.keys(TEXT_CONTENT_TYPES).map((ext) => [ext, 'text' as const]),
-);
+const VIEWER_BY_EXTENSION: Record<string, ViewerKind> = {
+  ...Object.fromEntries(
+    Object.keys(TEXT_CONTENT_TYPES).map((ext) => [ext, 'text' as const]),
+  ),
+  '.pdf': 'pdf',
+};
 
 export function getExtension(filename: string): string {
   const base = filename.includes('/')
@@ -140,8 +143,19 @@ export function isTextFile(filename: string): boolean {
   return getViewerKind(filename) === 'text';
 }
 
+export function isPdfFile(filename: string): boolean {
+  return getViewerKind(filename) === 'pdf';
+}
+
 export function getTextContentType(filename: string): string {
   return TEXT_CONTENT_TYPES[getExtension(filename)] ?? 'text/plain; charset=utf-8';
+}
+
+export function getViewerContentType(filename: string): string {
+  const kind = getViewerKind(filename);
+  if (kind === 'text') return getTextContentType(filename);
+  if (kind === 'pdf') return 'application/pdf';
+  return 'application/octet-stream';
 }
 
 /** Content-Type if the file can be streamed to browsers without conversion; else null. */

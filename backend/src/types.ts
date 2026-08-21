@@ -10,8 +10,8 @@ export type MediaType = 'image' | 'video';
 
 export type EntryType = 'folder' | MediaType | 'file';
 
-/** Non-media overlay viewers. Keep in sync with backend ViewerKind. */
-export type ViewerKind = 'text';
+/** Non-media overlay viewers. Keep in sync with frontend ViewerKind. */
+export type ViewerKind = 'text' | 'pdf';
 
 export interface ShareInfo {
   name: string;

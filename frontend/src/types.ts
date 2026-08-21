@@ -11,7 +11,7 @@ export type MediaType = 'image' | 'video';
 export type EntryType = 'folder' | MediaType | 'file';
 
 /** Non-media overlay viewers. Keep in sync with backend ViewerKind. */
-export type ViewerKind = 'text';
+export type ViewerKind = 'text' | 'pdf';
 
 export interface QualityProfile {
   id: QualityTier;
