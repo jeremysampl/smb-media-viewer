@@ -8,7 +8,7 @@ import {
 } from '../permissions/resolver.js';
 import { authMiddleware, type AuthenticatedRequest } from '../auth/middleware.js';
 import { createMediaToken } from '../media/tokens.js';
-import { getFormatLabel, isImageFile, isMediaFile, isVideoFile } from '../media/fileTypes.js';
+import { getFormatLabel, isImageFile, isMediaFile, isVideoFile, getViewerKind } from '../media/fileTypes.js';
 import { getMediaIndexRows } from '../index/db.js';
 import { CAPTURE_META_VERSION, enqueueIndexJobs, type IndexJob } from '../index/indexer.js';
 import { mapWithConcurrency } from '../util/concurrency.js';
@@ -166,6 +166,10 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
 
   for (const file of statedOther) {
     if (!file) continue;
+    const viewer = getViewerKind(file.name);
+    const token = viewer
+      ? createMediaToken(file.absoluteEntryPath, username)
+      : undefined;
     entries.push({
       name: file.name,
       path: file.entryBrowsePath,
@@ -173,6 +177,8 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
       size: file.stats.size,
       mtime: file.stats.mtime.toISOString(),
       format: getFormatLabel(file.name),
+      viewer: viewer ?? undefined,
+      token,
     });
   }
 

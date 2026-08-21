@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 import { Router } from 'express';
 import { authMiddleware, type AuthenticatedRequest } from '../auth/middleware.js';
 import { streamFileWithRange } from '../cache/cache.js';
@@ -9,9 +11,17 @@ import { verifyMediaToken } from '../media/tokens.js';
 import { getTranscodedVideo } from '../media/video.js';
 import { getMediaMetadata } from '../media/metadata.js';
 import { resolveShareForPath } from '../permissions/resolver.js';
-import { isMediaFile } from '../media/fileTypes.js';
+import {
+  getTextContentType,
+  getViewerKind,
+  isMediaFile,
+  isTextFile,
+} from '../media/fileTypes.js';
 
 const router = Router();
+
+/** Soft cap for in-browser text viewing (bytes). */
+const TEXT_VIEW_MAX_BYTES = 5 * 1024 * 1024;
 
 function getTokenParam(value: string | string[]): string {
   return Array.isArray(value) ? value[0] : value;
@@ -115,6 +125,55 @@ router.get('/:token/metadata', async (req: AuthenticatedRequest, res) => {
   } catch (error) {
     console.error('Metadata extraction failed:', error);
     res.status(500).json({ error: 'Failed to read image metadata' });
+  }
+});
+
+/**
+ * Stream a viewable non-media file (text today; other kinds later).
+ * Text previews are capped so huge dumps don't blow up the browser.
+ */
+router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
+  const sourcePath = await authorizeMedia(req, getTokenParam(req.params.token));
+  if (!sourcePath) {
+    res.status(404).json({ error: 'File not found' });
+    return;
+  }
+
+  const viewer = getViewerKind(path.basename(sourcePath));
+  if (!viewer) {
+    res.status(400).json({ error: 'This file type cannot be previewed' });
+    return;
+  }
+
+  try {
+    const stats = await fsp.stat(sourcePath);
+    if (!stats.isFile()) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    if (viewer === 'text') {
+      if (!isTextFile(sourcePath)) {
+        res.status(400).json({ error: 'Not a text file' });
+        return;
+      }
+      if (stats.size > TEXT_VIEW_MAX_BYTES) {
+        res.status(413).json({
+          error: `File is too large to preview (max ${Math.round(TEXT_VIEW_MAX_BYTES / (1024 * 1024))} MB)`,
+        });
+        return;
+      }
+      res.setHeader('Content-Type', getTextContentType(sourcePath));
+    } else {
+      res.setHeader('Content-Type', 'application/octet-stream');
+    }
+
+    res.setHeader('Content-Length', String(stats.size));
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    fs.createReadStream(sourcePath).pipe(res);
+  } catch (error) {
+    console.error('Raw file serve failed:', error);
+    res.status(500).json({ error: 'Failed to read file' });
   }
 });
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { BrowseEntry } from '../types';
+import { isViewableFileEntry } from '../viewer/kinds';
 
 export interface ContextMenuState {
   x: number;
@@ -37,7 +38,11 @@ export function EntryContextMenu({
   onDownloadSelected,
 }: EntryContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const canView = menu.entry.type === 'folder' || menu.entry.type === 'image' || menu.entry.type === 'video';
+  const canView =
+    menu.entry.type === 'folder' ||
+    menu.entry.type === 'image' ||
+    menu.entry.type === 'video' ||
+    isViewableFileEntry(menu.entry);
 
   useEffect(() => {
     const node = ref.current;

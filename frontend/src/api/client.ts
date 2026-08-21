@@ -237,12 +237,24 @@ export async function getQualityProfiles(): Promise<{ profiles: QualityProfile[]
 
 export function mediaUrl(
   token: string,
-  kind: 'image' | 'video' | 'poster',
+  kind: 'image' | 'video' | 'poster' | 'raw',
   quality?: string,
 ): string {
   const base = `${API_BASE}/media/${token}/${kind}`;
-  if (kind === 'poster') return base;
+  if (kind === 'poster' || kind === 'raw') return base;
   return `${base}?quality=${quality ?? 'medium'}`;
+}
+
+export async function fetchRawText(token: string): Promise<string> {
+  const response = await fetch(mediaUrl(token, 'raw'), {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const message = (body as { error?: string }).error ?? response.statusText;
+    throw new Error(message || 'Failed to load file');
+  }
+  return response.text();
 }
 
 export async function getMediaMetadata(token: string): Promise<MediaMetadata> {

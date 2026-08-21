@@ -10,6 +10,9 @@ export type MediaType = 'image' | 'video';
 
 export type EntryType = 'folder' | MediaType | 'file';
 
+/** Non-media overlay viewers. Keep in sync with backend ViewerKind. */
+export type ViewerKind = 'text';
+
 export interface QualityProfile {
   id: QualityTier;
   label: string;
@@ -26,6 +29,8 @@ export interface BrowseEntry {
   captureTime?: string;
   /** False until the index has a fresh row for this file. */
   indexed?: boolean;
+  /** Which overlay viewer opens this non-media file. */
+  viewer?: ViewerKind;
   format?: string;
   duration?: number;
   token?: string;

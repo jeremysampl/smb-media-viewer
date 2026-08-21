@@ -6,6 +6,8 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { Breadcrumbs } from './Breadcrumbs';
 import { browsePathToUrl, urlSplatToBrowsePath } from './browsePath';
 import { MediaGallery } from '../gallery/MediaGallery';
+import { FileViewerHost } from '../viewer/FileViewerHost';
+import { isViewableFileEntry } from '../viewer/kinds';
 import { LazyThumbnail } from './LazyThumbnail';
 import { FileTypeIcon } from './FileTypeIcon';
 import { VirtualFileGrid } from './VirtualFileGrid';
@@ -53,6 +55,7 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
   const [error, setError] = useState('');
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [fileViewerEntry, setFileViewerEntry] = useState<BrowseEntry | null>(null);
   const { quality, setQuality, profiles } = useQualityPreference();
   const { sort, setSort } = useSortPreference();
   const { fileTypeFilter, setFileTypeFilter } = useFileTypeFilterPreference();
@@ -346,7 +349,12 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
       navigateToPath(entry.path);
       return;
     }
-    if (entry.type === 'file') return;
+    if (entry.type === 'file') {
+      if (isViewableFileEntry(entry)) {
+        setFileViewerEntry(entry);
+      }
+      return;
+    }
 
     const index = mediaEntries.findIndex((item) => item.path === entry.path);
     setGalleryIndex(index >= 0 ? index : 0);
@@ -670,6 +678,12 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
         initialIndex={galleryIndex}
         open={galleryOpen}
         onClose={() => setGalleryOpen(false)}
+      />
+
+      <FileViewerHost
+        entry={fileViewerEntry}
+        open={Boolean(fileViewerEntry)}
+        onClose={() => setFileViewerEntry(null)}
       />
 
       <DownloadDialog
