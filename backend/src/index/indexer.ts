@@ -10,7 +10,7 @@ import { getQualityProfile } from '../media/quality.js';
 import { getVideoBrowseInfo } from '../media/videoMetadata.js';
 import { recordFinishedJob } from '../jobs/tracker.js';
 import { createSemaphore } from '../util/concurrency.js';
-import { getIndexDb, getThumbPath, upsertMediaIndexRow } from './db.js';
+import { getIndexDb, getMediaIndexRow, getThumbPath, upsertMediaIndexRow } from './db.js';
 
 export interface IndexJob {
   absolutePath: string;
@@ -18,6 +18,9 @@ export interface IndexJob {
   size: number;
   kind: 'image' | 'video';
 }
+
+/** Bump when capture-time parsing changes so existing rows are refreshed. */
+export const CAPTURE_META_VERSION = 2;
 
 /** Shared limit for background indexing and on-demand thumbs. */
 const indexWork = createSemaphore(config.indexConcurrency);
@@ -281,18 +284,13 @@ async function indexOne(
       // generate below
     }
 
-    // Serve an existing thumb first for HTTP; metadata can catch up later.
-    // Background jobs always refresh capture/duration.
-    const needsMeta = !options.requireThumb || !thumbReady;
-
-    if (needsMeta) {
-      if (job.kind === 'image') {
-        captureTime = (await getImageCaptureTime(job.absolutePath)) ?? null;
-      } else {
-        const info = await getVideoBrowseInfo(job.absolutePath);
-        captureTime = info.captureTime ?? null;
-        duration = info.duration ?? null;
-      }
+    // Always refresh capture/duration when indexing (parsing can improve over time).
+    if (job.kind === 'image') {
+      captureTime = (await getImageCaptureTime(job.absolutePath)) ?? null;
+    } else {
+      const info = await getVideoBrowseInfo(job.absolutePath);
+      captureTime = info.captureTime ?? null;
+      duration = info.duration ?? null;
     }
 
     if (!thumbReady) {
@@ -308,7 +306,7 @@ async function indexOne(
       }
     }
 
-    if (needsMeta || thumbReady) {
+    if (thumbReady || captureTime || duration != null) {
       upsertMediaIndexRow({
         absolutePath: job.absolutePath,
         mtimeMs: job.mtimeMs,
@@ -317,6 +315,7 @@ async function indexOne(
         thumbKey: thumbReady ? thumbKey : null,
         captureTime,
         duration,
+        captureMetaVersion: CAPTURE_META_VERSION,
       });
     }
 
@@ -466,15 +465,15 @@ export async function ensureIndexAsset(
   size: number,
   kind: 'image' | 'video',
 ): Promise<{ filePath: string; contentType: string }> {
-  const thumbKey = thumbKeyFor(absolutePath, mtimeMs, kind);
-  const thumbPath = getThumbPath(thumbKey);
-
-  // Thumb already on disk; skip the heavy work.
-  try {
-    await fs.access(thumbPath);
-    return { filePath: thumbPath, contentType: 'image/webp' };
-  } catch {
-    // generate below
+  const existing = getMediaIndexRow(absolutePath);
+  if (existing?.mtimeMs === mtimeMs && existing.thumbKey) {
+    const existingThumb = getThumbPath(existing.thumbKey);
+    try {
+      await fs.access(existingThumb);
+      return { filePath: existingThumb, contentType: 'image/webp' };
+    } catch {
+      // regenerate below
+    }
   }
 
   const result = await indexOne(

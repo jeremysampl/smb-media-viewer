@@ -148,9 +148,9 @@ export function useMobileGridColumns(enabled: boolean) {
     offsetRef.current = nextOffset;
     writeOffset(landscapeRef.current, nextOffset);
 
-    setColumns(snapped);
     columnsRef.current = snapped;
     applyVisualColumns(snapped);
+    setColumns(snapped);
   }, [applyVisualColumns]);
 
   const resyncToViewport = useCallback(() => {
@@ -229,12 +229,13 @@ export function useMobileGridColumns(enabled: boolean) {
 
       const pinch = pinchRef.current;
       pinchRef.current = null;
-      setIsPinching(false);
-      gridEl.classList.remove('is-pinching');
 
       const raw = Number(gridEl.style.getPropertyValue('--cols'));
       const currentCols = Number.isFinite(raw) && raw > 0 ? raw : pinch.columns;
+      // Snap columns while still in pinch preview, then leave preview in the same turn.
       commitColumns(currentCols);
+      setIsPinching(false);
+      gridEl.classList.remove('is-pinching');
 
       if (suppressClickRef.current) {
         window.setTimeout(() => {

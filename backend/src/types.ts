@@ -27,6 +27,8 @@ export interface BrowseEntry {
   size?: number;
   mtime?: string;
   captureTime?: string;
+  /** False until the index has a fresh row for this file (thumb may still be generating). */
+  indexed?: boolean;
   format?: string;
   duration?: number;
   token?: string;

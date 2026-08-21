@@ -187,10 +187,27 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
     });
   }, [entries, fileTypeFilter, sort, indexingActive]);
 
-  const gridLayoutKey = useMemo(
-    () => `${fileTypeFilter}\n${sortedEntries.map((entry) => entry.path).join('\n')}`,
-    [fileTypeFilter, sortedEntries],
+  const mediaEntries = useMemo(
+    () =>
+      sortedEntries.filter(
+        (entry) => entry.type === 'image' || entry.type === 'video',
+      ),
+    [sortedEntries],
   );
+
+  const gridLayoutKey = useMemo(() => {
+    // Cheap order fingerprint for LazyThumbnail (avoid joining every path).
+    let hash = 2166136261;
+    for (const entry of sortedEntries) {
+      const path = entry.path;
+      for (let i = 0; i < path.length; i += 1) {
+        hash ^= path.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+      }
+      hash ^= 10;
+    }
+    return `${fileTypeFilter}:${sortedEntries.length}:${hash >>> 0}`;
+  }, [fileTypeFilter, sortedEntries]);
 
   useEffect(() => {
     if (!typeFilterBusy) return undefined;
@@ -208,7 +225,8 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
     () =>
       entries.some(
         (entry) =>
-          (entry.type === 'image' || entry.type === 'video') && !entry.captureTime,
+          (entry.type === 'image' || entry.type === 'video') &&
+          entry.indexed === false,
       ),
     [entries],
   );
@@ -227,7 +245,8 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
     let cancelled = false;
     let attempts = 0;
     let stagnantRounds = 0;
-    const maxAttempts = 12;
+    // Large folders need more time; stop once the index marks files ready.
+    const maxAttempts = 120;
 
     const stop = () => {
       if (!cancelled) setIndexingActive(false);
@@ -251,20 +270,41 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
 
           setEntries((previous) => {
             let filled = 0;
+            let stillPending = false;
             let changed = false;
             const next = previous.map((prior) => {
               const incoming = incomingByPath.get(prior.path);
-              if (!incoming) return prior;
+              if (!incoming) {
+                if (
+                  (prior.type === 'image' || prior.type === 'video') &&
+                  prior.indexed === false
+                ) {
+                  stillPending = true;
+                }
+                return prior;
+              }
 
               const nextCapture = incoming.captureTime ?? prior.captureTime;
               const nextDuration = incoming.duration ?? prior.duration;
+              const nextIndexed =
+                incoming.indexed !== undefined ? incoming.indexed : prior.indexed;
+
+              if (
+                (prior.type === 'image' || prior.type === 'video') &&
+                nextIndexed === false
+              ) {
+                stillPending = true;
+              }
+
               if (
                 nextCapture === prior.captureTime &&
-                nextDuration === prior.duration
+                nextDuration === prior.duration &&
+                nextIndexed === prior.indexed
               ) {
                 return prior;
               }
 
+              if (prior.indexed === false && nextIndexed === true) filled += 1;
               if (!prior.captureTime && nextCapture) filled += 1;
               changed = true;
 
@@ -272,13 +312,16 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
                 ...prior,
                 captureTime: nextCapture,
                 duration: nextDuration,
+                indexed: nextIndexed,
                 thumbnailUrl: prior.thumbnailUrl,
               };
             });
 
-            if (filled === 0) {
+            if (!stillPending) {
+              stop();
+            } else if (filled === 0) {
               stagnantRounds += 1;
-              if (stagnantRounds >= 3) {
+              if (stagnantRounds >= 6) {
                 stop();
               }
             } else {
@@ -289,7 +332,7 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
           });
         })
         .catch(() => undefined);
-    }, 5000);
+    }, 4000);
 
     return () => {
       cancelled = true;
@@ -305,9 +348,6 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
     }
     if (entry.type === 'file') return;
 
-    const mediaEntries = sortedEntries.filter(
-      (item) => item.type === 'image' || item.type === 'video',
-    );
     const index = mediaEntries.findIndex((item) => item.path === entry.path);
     setGalleryIndex(index >= 0 ? index : 0);
     setGalleryOpen(true);
@@ -437,8 +477,8 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
       {showIndexBanner ? (
         <div className="index-snackbar" role="status" aria-live="polite">
           <p>
-            Still reading capture dates from EXIF. Items may shift as that data
-            arrives{sort === 'date_desc' || sort === 'date_asc' ? ' (especially with date sort)' : ''}.
+            Still reading media info for this folder. Date order may shift until
+            that finishes{sort === 'date_desc' || sort === 'date_asc' ? ' (especially with date sort)' : ''}.
           </p>
           <button
             type="button"
@@ -456,6 +496,7 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
           entries={sortedEntries}
           isMobile={isMobile}
           mobileColumns={columns}
+          isPinching={isPinching}
           showGridDetails={showGridDetails}
           className={`file-grid${isMobile ? ' file-grid-mobile' : ''}${
             isPinching ? ' is-pinching' : ''
@@ -491,7 +532,10 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
                 onPointerLeave={clearLongPress}
               >
                 {selectMode ? (
-                  <span className={`selection-check${selected ? ' checked' : ''}`} aria-hidden>
+                  <span
+                    className={`selection-check${selected ? ' checked' : ''}`}
+                    aria-hidden
+                  >
                     {selected ? '✓' : ''}
                   </span>
                 ) : null}
@@ -505,14 +549,19 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
                   ) : entry.token && entry.type === 'image' ? (
                     <LazyThumbnail
                       key={`${entry.path}:${sort}:${fileTypeFilter}`}
-                      src={entry.thumbnailUrl ?? mediaUrl(entry.token, 'image', 'very_low')}
+                      src={
+                        entry.thumbnailUrl ??
+                        mediaUrl(entry.token, 'image', 'very_low')
+                      }
                       alt={entry.name}
                       layoutKey={gridLayoutKey}
                     />
                   ) : entry.token && entry.type === 'video' ? (
                     <LazyThumbnail
                       key={`${entry.path}:${sort}:${fileTypeFilter}`}
-                      src={entry.thumbnailUrl ?? mediaUrl(entry.token, 'poster')}
+                      src={
+                        entry.thumbnailUrl ?? mediaUrl(entry.token, 'poster')
+                      }
                       alt={entry.name}
                       layoutKey={gridLayoutKey}
                     />
@@ -617,7 +666,7 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
       ) : null}
 
       <MediaGallery
-        entries={sortedEntries}
+        entries={mediaEntries}
         initialIndex={galleryIndex}
         open={galleryOpen}
         onClose={() => setGalleryOpen(false)}

@@ -11,6 +11,7 @@ export interface MediaIndexRow {
   thumbKey: string | null;
   captureTime: string | null;
   duration: number | null;
+  captureMetaVersion: number;
 }
 
 let db: DatabaseSync | null = null;
@@ -18,6 +19,13 @@ let db: DatabaseSync | null = null;
 function ensureIndexDir(): void {
   fs.mkdirSync(config.indexDir, { recursive: true });
   fs.mkdirSync(path.join(config.indexDir, 'thumbs'), { recursive: true });
+}
+
+function tableHasColumn(database: DatabaseSync, table: string, column: string): boolean {
+  const rows = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{
+    name: string;
+  }>;
+  return rows.some((row) => row.name === column);
 }
 
 export function getIndexDb(): DatabaseSync {
@@ -37,11 +45,18 @@ export function getIndexDb(): DatabaseSync {
       thumb_key TEXT,
       capture_time TEXT,
       duration REAL,
-      indexed_at INTEGER NOT NULL
+      indexed_at INTEGER NOT NULL,
+      capture_meta_version INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_media_index_mtime
       ON media_index (mtime_ms);
   `);
+
+  if (!tableHasColumn(db, 'media_index', 'capture_meta_version')) {
+    db.exec(
+      `ALTER TABLE media_index ADD COLUMN capture_meta_version INTEGER NOT NULL DEFAULT 0`,
+    );
+  }
 
   return db;
 }
@@ -54,7 +69,8 @@ export function getMediaIndexRows(
 
   const database = getIndexDb();
   const stmt = database.prepare(`
-    SELECT absolute_path, mtime_ms, size, kind, thumb_key, capture_time, duration
+    SELECT absolute_path, mtime_ms, size, kind, thumb_key, capture_time, duration,
+           capture_meta_version
     FROM media_index
     WHERE absolute_path = ?
   `);
@@ -69,6 +85,7 @@ export function getMediaIndexRows(
           thumb_key: string | null;
           capture_time: string | null;
           duration: number | null;
+          capture_meta_version: number | null;
         }
       | undefined;
 
@@ -81,6 +98,7 @@ export function getMediaIndexRows(
       thumbKey: row.thumb_key,
       captureTime: row.capture_time,
       duration: row.duration,
+      captureMetaVersion: row.capture_meta_version ?? 0,
     });
   }
 
@@ -95,22 +113,25 @@ export function upsertMediaIndexRow(row: {
   thumbKey: string | null;
   captureTime: string | null;
   duration: number | null;
+  captureMetaVersion: number;
 }): void {
   const database = getIndexDb();
   database
     .prepare(
       `
       INSERT INTO media_index (
-        absolute_path, mtime_ms, size, kind, thumb_key, capture_time, duration, indexed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        absolute_path, mtime_ms, size, kind, thumb_key, capture_time, duration,
+        indexed_at, capture_meta_version
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(absolute_path) DO UPDATE SET
         mtime_ms = excluded.mtime_ms,
         size = excluded.size,
         kind = excluded.kind,
         thumb_key = COALESCE(excluded.thumb_key, media_index.thumb_key),
-        capture_time = COALESCE(excluded.capture_time, media_index.capture_time),
+        capture_time = excluded.capture_time,
         duration = COALESCE(excluded.duration, media_index.duration),
-        indexed_at = excluded.indexed_at
+        indexed_at = excluded.indexed_at,
+        capture_meta_version = excluded.capture_meta_version
     `,
     )
     .run(
@@ -122,6 +143,7 @@ export function upsertMediaIndexRow(row: {
       row.captureTime,
       row.duration,
       Date.now(),
+      row.captureMetaVersion,
     );
 }
 
@@ -238,7 +260,8 @@ export function queryMediaIndexEntries(query: IndexListQuery = {}): {
   const rows = database
     .prepare(
       `
-      SELECT absolute_path, mtime_ms, size, kind, thumb_key, capture_time, duration, indexed_at
+      SELECT absolute_path, mtime_ms, size, kind, thumb_key, capture_time, duration, indexed_at,
+             capture_meta_version
       FROM media_index
       ${whereSql}
       ORDER BY ${sortCol} ${order}
@@ -254,6 +277,7 @@ export function queryMediaIndexEntries(query: IndexListQuery = {}): {
     capture_time: string | null;
     duration: number | null;
     indexed_at: number;
+    capture_meta_version: number | null;
   }>;
 
   return {
@@ -268,6 +292,7 @@ export function queryMediaIndexEntries(query: IndexListQuery = {}): {
       thumbKey: row.thumb_key,
       captureTime: row.capture_time,
       duration: row.duration,
+      captureMetaVersion: row.capture_meta_version ?? 0,
       indexedAt: row.indexed_at,
     })),
   };

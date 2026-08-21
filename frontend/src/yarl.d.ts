@@ -9,4 +9,8 @@ declare module 'yet-another-react-lightbox' {
     /** Browse entry path; stays stable when quality URLs change. */
     entryPath?: string;
   }
+
+  interface SlideVideo {
+    entryPath?: string;
+  }
 }

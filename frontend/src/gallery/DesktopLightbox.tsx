@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Lightbox, {
   IconButton,
   createIcon,
@@ -89,6 +89,59 @@ function previewFor(entry: BrowseEntry): string {
   return entry.thumbnailUrl ?? mediaUrl(entry.token, 'image', 'very_low');
 }
 
+type GallerySlide = {
+  type?: 'video';
+  sources?: Array<{ src: string; type: string }>;
+  poster?: string;
+  src?: string;
+  alt?: string;
+  title?: string;
+  width?: number;
+  height?: number;
+  entryPath: string;
+};
+
+function buildSlide(
+  entry: BrowseEntry,
+  useFull: boolean,
+  quality: QualityTier,
+  size?: { width: number; height: number },
+): GallerySlide {
+  const preview = previewFor(entry);
+
+  if (entry.type === 'video' && entry.token) {
+    return {
+      type: 'video',
+      sources: useFull
+        ? [{ src: mediaUrl(entry.token, 'video', quality), type: 'video/mp4' }]
+        : [],
+      poster: preview || mediaUrl(entry.token, 'poster'),
+      entryPath: entry.path,
+    };
+  }
+
+  return {
+    src: entry.token
+      ? useFull
+        ? mediaUrl(entry.token, 'image', quality)
+        : preview
+      : '',
+    alt: entry.name,
+    title: entry.name,
+    ...(size ? { width: size.width, height: size.height } : {}),
+    entryPath: entry.path,
+  };
+}
+
+function stubSlide(entry: BrowseEntry): GallerySlide {
+  return {
+    src: previewFor(entry),
+    alt: entry.name,
+    title: entry.name,
+    entryPath: entry.path,
+  };
+}
+
 export function DesktopLightbox({
   entries,
   initialIndex,
@@ -98,41 +151,56 @@ export function DesktopLightbox({
   const { quality, setQuality, profiles } = useQualityPreference();
   const [index, setIndex] = useState(initialIndex);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  /** Paths that were active; keep full-quality src so swiping away doesn't swap renderers. */
   const [hydratedPaths, setHydratedPaths] = useState<Set<string>>(() => new Set());
-  /** Natural sizes by entry path so quality URL changes keep zoom stable. */
   const [imageSizeByPath, setImageSizeByPath] = useState<
     Record<string, { width: number; height: number }>
   >({});
   const useChromeRaster = shouldUseChromeImageRaster();
+  const slidesRef = useRef<GallerySlide[]>([]);
+  const stubsReadyFor = useRef<BrowseEntry[] | null>(null);
 
   const mediaEntries = useMemo(
     () => entries.filter((entry) => entry.type === 'image' || entry.type === 'video'),
     [entries],
   );
+  const mediaEntriesRef = useRef(mediaEntries);
+  mediaEntriesRef.current = mediaEntries;
 
   useEffect(() => {
     if (!open) {
       setHydratedPaths(new Set());
+      slidesRef.current = [];
+      stubsReadyFor.current = null;
       return;
     }
     setIndex(initialIndex);
     setDetailsOpen(false);
-    const initial = mediaEntries[initialIndex];
+    const initial = mediaEntriesRef.current[initialIndex];
     setHydratedPaths(initial ? new Set([initial.path]) : new Set());
-  }, [open, initialIndex, mediaEntries]);
+  }, [open, initialIndex]);
 
   useEffect(() => {
     setDetailsOpen(false);
   }, [index]);
 
   useEffect(() => {
-    const entry = mediaEntries[index];
-    if (!entry) return;
     setHydratedPaths((previous) => {
-      if (previous.has(entry.path)) return previous;
-      const next = new Set(previous);
-      next.add(entry.path);
+      const next = new Set<string>();
+      for (let offset = -1; offset <= 1; offset += 1) {
+        const entry = mediaEntries[index + offset];
+        if (!entry) continue;
+        if (offset === 0 || previous.has(entry.path)) next.add(entry.path);
+      }
+      if (next.size === previous.size) {
+        let same = true;
+        for (const path of next) {
+          if (!previous.has(path)) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return previous;
+      }
       return next;
     });
   }, [index, mediaEntries]);
@@ -149,53 +217,37 @@ export function DesktopLightbox({
 
   const currentEntry = mediaEntries[index];
 
+  // Keep a full-length slides array for YARL indexing, but only rebuild nearby slots.
   const slides = useMemo(() => {
-    return mediaEntries.map((entry) => {
-      const preview = previewFor(entry);
+    if (stubsReadyFor.current !== mediaEntries) {
+      slidesRef.current = mediaEntries.map(stubSlide);
+      stubsReadyFor.current = mediaEntries;
+    }
+
+    const slidesList = slidesRef.current;
+    for (let offset = -1; offset <= 1; offset += 1) {
+      const slideIndex = index + offset;
+      const entry = mediaEntries[slideIndex];
+      if (!entry) continue;
       const useFull = hydratedPaths.has(entry.path);
+      slidesList[slideIndex] = buildSlide(
+        entry,
+        useFull,
+        quality,
+        imageSizeByPath[entry.path],
+      );
+    }
 
-      if (entry.type === 'video' && entry.token) {
-        return {
-          type: 'video' as const,
-          // Only visited/current slides get a video source; neighbors stay poster-only.
-          sources: useFull
-            ? [
-                {
-                  src: mediaUrl(entry.token, 'video', quality),
-                  type: 'video/mp4',
-                },
-              ]
-            : [],
-          poster: preview || mediaUrl(entry.token, 'poster'),
-        };
-      }
-
-      const src = entry.token
-        ? useFull
-          ? mediaUrl(entry.token, 'image', quality)
-          : preview
-        : '';
-      const size = imageSizeByPath[entry.path];
-
-      return {
-        // Same ImageSlide chrome; URL differs until the slide has been viewed.
-        src,
-        alt: entry.name,
-        title: entry.name,
-        // Keep dims across quality changes so zoom doesn't reset.
-        ...(size ? { width: size.width, height: size.height } : {}),
-        // Passed through for onNaturalSize path keying.
-        entryPath: entry.path,
-      };
-    });
-  }, [mediaEntries, quality, hydratedPaths, imageSizeByPath]);
+    // New array so YARL sees an update; elements reuse object identity for distant slides.
+    return slidesList.slice();
+  }, [mediaEntries, quality, hydratedPaths, imageSizeByPath, index]);
 
   return (
     <Lightbox
       open={open}
       close={onClose}
       index={index}
-      slides={slides}
+      slides={slides as never}
       plugins={[Video, Zoom]}
       zoom={{ scrollToZoom: true, maxZoomPixelRatio: 4, maxZoom: 20 }}
       toolbar={{
@@ -217,7 +269,10 @@ export function DesktopLightbox({
       render={{
         slide: ({ slide, rect, zoom }) => {
           if (!useChromeRaster || !isImageSlide(slide)) return undefined;
-          const entryPath = slide.entryPath ?? slide.src;
+          const entryPath =
+            ('entryPath' in slide && typeof slide.entryPath === 'string'
+              ? slide.entryPath
+              : null) ?? slide.src;
           return (
             <ChromeRasterImage
               variant="desktop"

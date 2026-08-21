@@ -631,6 +631,24 @@ button.breadcrumb-chip:focus-visible,
   display: block;
 }
 
+.file-grid-pinch-preview {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--gap, 8px);
+  will-change: gap;
+}
+
+.file-grid-mobile.file-grid-pinch-mode .file-grid-pinch-preview .file-card {
+  /* Same fractional --cols sizing as the non-virtual mobile grid. */
+  flex: 0 0 calc((100% - (var(--cols, 3) - 1) * var(--gap, 8px)) / var(--cols, 3));
+  width: calc((100% - (var(--cols, 3) - 1) * var(--gap, 8px)) / var(--cols, 3));
+  max-width: calc((100% - (var(--cols, 3) - 1) * var(--gap, 8px)) / var(--cols, 3));
+}
+
 .file-grid-virtual-row {
   align-items: stretch;
 }
@@ -1330,15 +1348,16 @@ button.breadcrumb-chip:focus-visible,
 }
 
 .mobile-gallery-track {
-  display: flex;
-  align-items: stretch;
+  position: relative;
+  width: 100%;
   height: 100%;
   min-height: 0;
   will-change: transform;
 }
 
 .mobile-gallery-slide-item {
-  flex: 0 0 auto;
+  position: absolute;
+  top: 0;
   box-sizing: border-box;
   height: 100%;
   min-width: 0;
