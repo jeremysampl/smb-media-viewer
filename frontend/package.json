@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.14.7",
+    "dompurify": "^3.4.14",
+    "katex": "^0.18.4",
+    "marked": "^18.0.10",
     "pdfjs-dist": "^5.7.284",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -19,6 +22,8 @@
     "yet-another-react-lightbox": "^3.32.0"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
+    "@types/katex": "^0.16.8",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

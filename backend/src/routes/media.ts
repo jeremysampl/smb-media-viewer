@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Router } from 'express';
 import { authMiddleware, type AuthenticatedRequest } from '../auth/middleware.js';
 import { streamFileWithRange } from '../cache/cache.js';
+import { resolveDocumentAssetPath } from '../media/documentAssets.js';
 import { getResizedImage } from '../media/image.js';
 import { isQualityTier } from '../media/quality.js';
 import { getOfficePdf } from '../media/office.js';
@@ -13,13 +14,15 @@ import { getTranscodedVideo } from '../media/video.js';
 import { getMediaMetadata } from '../media/metadata.js';
 import { resolveShareForPath } from '../permissions/resolver.js';
 import {
+  getBrowserNativeImageContentType,
+  getExtension,
   getViewerContentType,
   getViewerKind,
+  isImageFile,
   isMediaFile,
   isOfficeFile,
   isPdfFile,
   isSpreadsheetFile,
-  isTextFile,
 } from '../media/fileTypes.js';
 
 const router = Router();
@@ -29,6 +32,46 @@ const TEXT_VIEW_MAX_BYTES = 5 * 1024 * 1024;
 const PDF_VIEW_MAX_BYTES = 80 * 1024 * 1024;
 const SPREADSHEET_VIEW_MAX_BYTES = 25 * 1024 * 1024;
 const OFFICE_VIEW_MAX_BYTES = 50 * 1024 * 1024;
+
+const IMAGE_EXTENSION_FALLBACKS = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.svg',
+  '.bmp',
+  '.tif',
+  '.tiff',
+  '.heic',
+  '.heif',
+  '.avif',
+];
+
+async function resolveExistingImagePath(candidate: string): Promise<string | null> {
+  const isEmbeddable = (filePath: string) =>
+    isImageFile(filePath) || getExtension(filePath) === '.svg';
+
+  try {
+    const stats = await fsp.stat(candidate);
+    if (stats.isFile() && isEmbeddable(candidate)) return candidate;
+  } catch {
+    // try extensions
+  }
+
+  if (getExtension(candidate)) return null;
+
+  for (const ext of IMAGE_EXTENSION_FALLBACKS) {
+    const withExt = `${candidate}${ext}`;
+    try {
+      const stats = await fsp.stat(withExt);
+      if (stats.isFile() && isEmbeddable(withExt)) return withExt;
+    } catch {
+      // continue
+    }
+  }
+  return null;
+}
 
 function getTokenParam(value: string | string[]): string {
   return Array.isArray(value) ? value[0] : value;
@@ -48,6 +91,20 @@ async function authorizeMedia(
   if (!share) return null;
 
   return payload.path;
+}
+
+async function authorizeMediaWithShare(
+  req: AuthenticatedRequest,
+  token: string,
+): Promise<{ documentPath: string; sharePath: string } | null> {
+  const payload = verifyMediaToken(token);
+  if (!payload) return null;
+  if (payload.username !== req.user!.username) return null;
+
+  const share = await resolveShareForPath(req.user!.username, payload.path);
+  if (!share) return null;
+
+  return { documentPath: payload.path, sharePath: share.path };
 }
 
 router.get('/:token/image', async (req: AuthenticatedRequest, res) => {
@@ -136,6 +193,67 @@ router.get('/:token/metadata', async (req: AuthenticatedRequest, res) => {
 });
 
 /**
+ * Serve an image referenced from a document (markdown/latex) preview.
+ * Path must stay under the same share as the document token.
+ */
+router.get('/:token/asset', async (req: AuthenticatedRequest, res) => {
+  const auth = await authorizeMediaWithShare(req, getTokenParam(req.params.token));
+  if (!auth) {
+    res.status(404).json({ error: 'File not found' });
+    return;
+  }
+
+  const rel = String(req.query.rel ?? '');
+  const resolved = resolveDocumentAssetPath(auth.documentPath, rel, auth.sharePath);
+  if (!resolved) {
+    res.status(403).json({ error: 'Asset path is not allowed' });
+    return;
+  }
+
+  const assetPath = await resolveExistingImagePath(resolved);
+  if (!assetPath) {
+    res.status(404).json({ error: 'Asset not found' });
+    return;
+  }
+
+  // Must stay on the same share as the document.
+  const assetShare = await resolveShareForPath(req.user!.username, assetPath);
+  if (!assetShare || path.resolve(assetShare.path) !== path.resolve(auth.sharePath)) {
+    res.status(403).json({ error: 'Asset is outside the document share' });
+    return;
+  }
+
+  try {
+    const stats = await fsp.stat(assetPath);
+    if (!stats.isFile()) {
+      res.status(404).json({ error: 'Asset not found' });
+      return;
+    }
+
+    const nativeType =
+      getExtension(assetPath) === '.svg'
+        ? 'image/svg+xml'
+        : getBrowserNativeImageContentType(assetPath);
+    if (nativeType) {
+      res.setHeader('Content-Type', nativeType);
+      res.setHeader('Content-Length', String(stats.size));
+      res.setHeader('Cache-Control', 'private, max-age=300');
+      fs.createReadStream(assetPath).pipe(res);
+      return;
+    }
+
+    // HEIC/TIFF/etc.: convert so the browser can show them.
+    const result = await getResizedImage(assetPath, 'high');
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    fs.createReadStream(result.filePath).pipe(res);
+  } catch (error) {
+    console.error('Document asset serve failed:', error);
+    res.status(500).json({ error: 'Failed to load asset' });
+  }
+});
+
+/**
  * Convert an Office file to PDF (cached) for preview.
  */
 router.get('/:token/pdf-preview', async (req: AuthenticatedRequest, res) => {
@@ -211,11 +329,7 @@ router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    if (viewer === 'text') {
-      if (!isTextFile(sourcePath)) {
-        res.status(400).json({ error: 'Not a text file' });
-        return;
-      }
+    if (viewer === 'text' || viewer === 'markdown' || viewer === 'latex') {
       if (stats.size > TEXT_VIEW_MAX_BYTES) {
         res.status(413).json({
           error: `File is too large to preview (max ${Math.round(TEXT_VIEW_MAX_BYTES / (1024 * 1024))} MB)`,

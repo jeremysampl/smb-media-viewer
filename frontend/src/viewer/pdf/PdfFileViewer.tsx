@@ -53,14 +53,17 @@ function PdfPage({
   pdf,
   pageNumber,
   scale,
+  onGoToPage,
 }: {
   pdf: PDFDocumentProxy;
   pageNumber: number;
   scale: number;
+  onGoToPage?: (page: number) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
+  const annotationLayerRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(pageNumber <= 2);
   const [height, setHeight] = useState(240);
 
@@ -116,19 +119,82 @@ function PdfPage({
 
       if (cancelled) return;
       const textHost = textLayerRef.current;
-      if (!textHost) return;
-      textHost.replaceChildren();
-      const textContent = await page.getTextContent();
+      if (textHost) {
+        textHost.replaceChildren();
+        const textContent = await page.getTextContent();
+        if (cancelled) return;
+        textLayer = new TextLayer({
+          textContentSource: textContent,
+          container: textHost,
+          viewport,
+        });
+        try {
+          await textLayer.render();
+        } catch {
+          // Cancelled when scale changes mid-render.
+        }
+      }
+
       if (cancelled) return;
-      textLayer = new TextLayer({
-        textContentSource: textContent,
-        container: textHost,
-        viewport,
-      });
-      try {
-        await textLayer.render();
-      } catch {
-        // Cancelled when scale changes mid-render.
+      const annotationHost = annotationLayerRef.current;
+      if (!annotationHost) return;
+      annotationHost.replaceChildren();
+      annotationHost.style.width = `${viewport.width}px`;
+      annotationHost.style.height = `${viewport.height}px`;
+
+      const annotations = await page.getAnnotations({ intent: 'display' });
+      if (cancelled) return;
+
+      for (const annotation of annotations) {
+        if (annotation.subtype !== 'Link') continue;
+        const rect = viewport.convertToViewportRectangle(annotation.rect);
+        const left = Math.min(rect[0], rect[2]);
+        const top = Math.min(rect[1], rect[3]);
+        const width = Math.abs(rect[2] - rect[0]);
+        const height = Math.abs(rect[3] - rect[1]);
+        if (width < 1 || height < 1) continue;
+
+        const link = document.createElement('a');
+        link.className = 'pdf-annotation-link';
+        link.style.left = `${left}px`;
+        link.style.top = `${top}px`;
+        link.style.width = `${width}px`;
+        link.style.height = `${height}px`;
+
+        if (typeof annotation.url === 'string' && annotation.url) {
+          link.href = annotation.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.title = annotation.url;
+        } else if (annotation.dest != null && onGoToPage) {
+          link.href = '#';
+          link.addEventListener('click', (event) => {
+            event.preventDefault();
+            void (async () => {
+              try {
+                const dest =
+                  typeof annotation.dest === 'string'
+                    ? await pdf.getDestination(annotation.dest)
+                    : annotation.dest;
+                if (!dest || !Array.isArray(dest) || dest.length === 0) return;
+                const pageRef = dest[0];
+                const index =
+                  typeof pageRef === 'object'
+                    ? await pdf.getPageIndex(pageRef)
+                    : Number(pageRef) - 1;
+                if (Number.isFinite(index) && index >= 0) {
+                  onGoToPage(index + 1);
+                }
+              } catch {
+                // Ignore broken destinations.
+              }
+            })();
+          });
+        } else {
+          continue;
+        }
+
+        annotationHost.appendChild(link);
       }
     })();
 
@@ -145,7 +211,7 @@ function PdfPage({
         // already finished
       }
     };
-  }, [pdf, pageNumber, scale, visible]);
+  }, [pdf, pageNumber, scale, visible, onGoToPage]);
 
   return (
     <div
@@ -157,6 +223,7 @@ function PdfPage({
       <div className="pdf-page-layer" style={{ width: '100%', height }}>
         <canvas ref={canvasRef} className="pdf-page-canvas" />
         <div ref={textLayerRef} className="textLayer" />
+        <div ref={annotationLayerRef} className="annotationLayer" />
       </div>
     </div>
   );
@@ -348,6 +415,13 @@ export function PdfFileViewer({
     window.open(blobUrl, '_blank', 'noopener,noreferrer');
   }, [blobUrl]);
 
+  const goToPage = useCallback((page: number) => {
+    const target = bodyRef.current?.querySelector(`[data-page="${page}"]`);
+    if (target instanceof HTMLElement) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
   useEffect(() => {
     const node = bodyRef.current;
     if (!node) return undefined;
@@ -528,6 +602,7 @@ export function PdfFileViewer({
                   pdf={pdf}
                   pageNumber={pageNumber}
                   scale={scale}
+                  onGoToPage={goToPage}
                 />
               ))}
             </div>

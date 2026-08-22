@@ -8,6 +8,8 @@ export type FileTypeFilter =
   | 'videos'
   | 'pdf'
   | 'text'
+  | 'markdown'
+  | 'latex'
   | 'document'
   | 'spreadsheet'
   | 'presentation'
@@ -72,10 +74,6 @@ const VIDEO_SUBTYPES: FilterOption[] = [
 const TEXT_FORMATS = new Set([
   'TXT',
   'TEXT',
-  'MD',
-  'MARKDOWN',
-  'CSV',
-  'TSV',
   'LOG',
   'JSON',
   'XML',
@@ -116,6 +114,10 @@ const TEXT_FORMATS = new Set([
   'EDITORCONFIG',
 ]);
 
+const MARKDOWN_FORMATS = new Set(['MD', 'MARKDOWN', 'MDOWN', 'MKD']);
+
+const LATEX_FORMATS = new Set(['TEX', 'LATEX', 'LTX']);
+
 const DOCUMENT_FORMATS = new Set([
   'DOC',
   'DOCX',
@@ -129,6 +131,10 @@ const SPREADSHEET_FORMATS = new Set([
   'XLSX',
   'ODS',
   'NUMBERS',
+  'CSV',
+  'TSV',
+  'XLSM',
+  'XLSB',
 ]);
 
 const PRESENTATION_FORMATS = new Set([
@@ -180,6 +186,8 @@ const KNOWN_OTHER_EXCLUDED = new Set([
   ...KNOWN_VIDEO_FORMATS,
   'PDF',
   ...TEXT_FORMATS,
+  ...MARKDOWN_FORMATS,
+  ...LATEX_FORMATS,
   ...DOCUMENT_FORMATS,
   ...SPREADSHEET_FORMATS,
   ...PRESENTATION_FORMATS,
@@ -206,6 +214,8 @@ export const FILE_TYPE_FILTER_GROUPS: FilterGroup[] = [
     options: [
       { id: 'pdf', label: 'PDF' },
       { id: 'text', label: 'Text' },
+      { id: 'markdown', label: 'Markdown' },
+      { id: 'latex', label: 'LaTeX' },
       { id: 'document', label: 'Word / Docs' },
       { id: 'spreadsheet', label: 'Spreadsheets' },
       { id: 'presentation', label: 'Presentations' },
@@ -266,6 +276,10 @@ export function entryMatchesFileTypeFilter(
       return entry.type === 'file' && format === 'PDF';
     case 'text':
       return entry.type === 'file' && TEXT_FORMATS.has(format);
+    case 'markdown':
+      return entry.type === 'file' && MARKDOWN_FORMATS.has(format);
+    case 'latex':
+      return entry.type === 'file' && LATEX_FORMATS.has(format);
     case 'document':
       return entry.type === 'file' && DOCUMENT_FORMATS.has(format);
     case 'spreadsheet':

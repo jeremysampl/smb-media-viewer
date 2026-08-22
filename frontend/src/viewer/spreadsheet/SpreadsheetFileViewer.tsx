@@ -1,12 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { fetchRawBlob } from '../../api/client';
+import { fetchRawBlob, fetchRawText } from '../../api/client';
 import { IconButton } from '../../ui';
+import {
+  PreviewSourceToggle,
+  type PreviewMode,
+} from '../PreviewSourceToggle';
 import type { FileViewerProps } from '../types';
 
+function isDelimitedText(format?: string): boolean {
+  const upper = (format ?? '').toUpperCase();
+  return upper === 'CSV' || upper === 'TSV';
+}
+
 export function SpreadsheetFileViewer({ entry, onClose }: FileViewerProps) {
+  const showSourceToggle = isDelimitedText(entry.format);
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [rawText, setRawText] = useState<string | null>(null);
   const [activeSheet, setActiveSheet] = useState('');
+  const [mode, setMode] = useState<PreviewMode>('preview');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -21,17 +33,32 @@ export function SpreadsheetFileViewer({ entry, onClose }: FileViewerProps) {
     setLoading(true);
     setError('');
     setWorkbook(null);
+    setRawText(null);
     setActiveSheet('');
+    setMode('preview');
 
     void (async () => {
       try {
-        const blob = await fetchRawBlob(entry.token!);
-        if (cancelled) return;
-        const buffer = await blob.arrayBuffer();
-        const book = XLSX.read(buffer, { type: 'array', cellDates: true });
-        if (cancelled) return;
-        setWorkbook(book);
-        setActiveSheet(book.SheetNames[0] ?? '');
+        if (showSourceToggle) {
+          const text = await fetchRawText(entry.token!);
+          if (cancelled) return;
+          setRawText(text);
+          const book = XLSX.read(text, {
+            type: 'string',
+            raw: false,
+            FS: entry.format?.toUpperCase() === 'TSV' ? '\t' : ',',
+          });
+          setWorkbook(book);
+          setActiveSheet(book.SheetNames[0] ?? '');
+        } else {
+          const blob = await fetchRawBlob(entry.token!);
+          if (cancelled) return;
+          const buffer = await blob.arrayBuffer();
+          const book = XLSX.read(buffer, { type: 'array', cellDates: true });
+          if (cancelled) return;
+          setWorkbook(book);
+          setActiveSheet(book.SheetNames[0] ?? '');
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load spreadsheet');
@@ -44,7 +71,7 @@ export function SpreadsheetFileViewer({ entry, onClose }: FileViewerProps) {
     return () => {
       cancelled = true;
     };
-  }, [entry.token, entry.path]);
+  }, [entry.token, entry.path, entry.format, showSourceToggle]);
 
   const sheetHtml = useMemo(() => {
     if (!workbook || !activeSheet) return '';
@@ -66,11 +93,21 @@ export function SpreadsheetFileViewer({ entry, onClose }: FileViewerProps) {
               <span className="file-viewer-format">{entry.format}</span>
             ) : null}
           </div>
-          <IconButton label="Close" className="file-viewer-close" onClick={onClose}>
-            ✕
-          </IconButton>
+          <div className="file-viewer-actions">
+            {showSourceToggle ? (
+              <PreviewSourceToggle
+                mode={mode}
+                onChange={setMode}
+                previewLabel="Table"
+                sourceLabel="Raw"
+              />
+            ) : null}
+            <IconButton label="Close" className="file-viewer-close" onClick={onClose}>
+              ✕
+            </IconButton>
+          </div>
         </header>
-        {sheetNames.length > 1 ? (
+        {mode === 'preview' && sheetNames.length > 1 ? (
           <div className="spreadsheet-tabs" role="tablist" aria-label="Sheets">
             {sheetNames.map((name) => (
               <button
@@ -89,7 +126,12 @@ export function SpreadsheetFileViewer({ entry, onClose }: FileViewerProps) {
         <div className="file-viewer-body spreadsheet-viewer-body">
           {loading ? <p className="file-viewer-status">Loading spreadsheet…</p> : null}
           {error ? <p className="file-viewer-error">{error}</p> : null}
-          {!loading && !error && sheetHtml ? (
+          {!loading && !error && mode === 'source' && rawText !== null ? (
+            <pre className="file-viewer-text">
+              <code>{rawText}</code>
+            </pre>
+          ) : null}
+          {!loading && !error && mode === 'preview' && sheetHtml ? (
             <div
               className="spreadsheet-table-wrap"
               dangerouslySetInnerHTML={{ __html: sheetHtml }}

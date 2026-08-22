@@ -44,7 +44,15 @@ const STYLE_BY_FORMAT: Record<string, FileIconStyle> = {
   TXT: { kind: 'text', label: 'TXT', color: '#94a3b8' },
   MD: { kind: 'text', label: 'MD', color: '#94a3b8' },
   MARKDOWN: { kind: 'text', label: 'MD', color: '#94a3b8' },
+  MDOWN: { kind: 'text', label: 'MD', color: '#94a3b8' },
+  MKD: { kind: 'text', label: 'MD', color: '#94a3b8' },
+  TEX: { kind: 'text', label: 'TEX', color: '#94a3b8' },
+  LATEX: { kind: 'text', label: 'TEX', color: '#94a3b8' },
+  LTX: { kind: 'text', label: 'TEX', color: '#94a3b8' },
   LOG: { kind: 'text', label: 'LOG', color: '#94a3b8' },
+
+  XLSM: { kind: 'spreadsheet', label: 'XLSM', color: '#22a06b' },
+  XLSB: { kind: 'spreadsheet', label: 'XLSB', color: '#22a06b' },
 
   JSON: { kind: 'code', label: 'JSON', color: '#a78bfa' },
   XML: { kind: 'code', label: 'XML', color: '#a78bfa' },

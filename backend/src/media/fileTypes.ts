@@ -41,15 +41,11 @@ const VIDEO_EXTENSIONS = new Set([
  * Viewer kinds for non-media files. Add a kind here, map extensions below,
  * then register a frontend viewer for that kind.
  */
-export type ViewerKind = 'text' | 'pdf' | 'spreadsheet' | 'office';
+export type ViewerKind = 'text' | 'pdf' | 'spreadsheet' | 'office' | 'markdown' | 'latex';
 
 const TEXT_CONTENT_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
   '.text': 'text/plain; charset=utf-8',
-  '.md': 'text/markdown; charset=utf-8',
-  '.markdown': 'text/markdown; charset=utf-8',
-  '.csv': 'text/csv; charset=utf-8',
-  '.tsv': 'text/tab-separated-values; charset=utf-8',
   '.log': 'text/plain; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.xml': 'application/xml; charset=utf-8',
@@ -90,12 +86,27 @@ const TEXT_CONTENT_TYPES: Record<string, string> = {
   '.editorconfig': 'text/plain; charset=utf-8',
 };
 
+const MARKDOWN_CONTENT_TYPES: Record<string, string> = {
+  '.md': 'text/markdown; charset=utf-8',
+  '.markdown': 'text/markdown; charset=utf-8',
+  '.mdown': 'text/markdown; charset=utf-8',
+  '.mkd': 'text/markdown; charset=utf-8',
+};
+
+const LATEX_CONTENT_TYPES: Record<string, string> = {
+  '.tex': 'application/x-tex; charset=utf-8',
+  '.latex': 'application/x-latex; charset=utf-8',
+  '.ltx': 'application/x-latex; charset=utf-8',
+};
+
 const SPREADSHEET_CONTENT_TYPES: Record<string, string> = {
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   '.xlsm': 'application/vnd.ms-excel.sheet.macroEnabled.12',
   '.xlsb': 'application/vnd.ms-excel.sheet.binary.macroEnabled.12',
   '.xls': 'application/vnd.ms-excel',
   '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+  '.csv': 'text/csv; charset=utf-8',
+  '.tsv': 'text/tab-separated-values; charset=utf-8',
 };
 
 const OFFICE_CONTENT_TYPES: Record<string, string> = {
@@ -111,6 +122,12 @@ const OFFICE_CONTENT_TYPES: Record<string, string> = {
 const VIEWER_BY_EXTENSION: Record<string, ViewerKind> = {
   ...Object.fromEntries(
     Object.keys(TEXT_CONTENT_TYPES).map((ext) => [ext, 'text' as const]),
+  ),
+  ...Object.fromEntries(
+    Object.keys(MARKDOWN_CONTENT_TYPES).map((ext) => [ext, 'markdown' as const]),
+  ),
+  ...Object.fromEntries(
+    Object.keys(LATEX_CONTENT_TYPES).map((ext) => [ext, 'latex' as const]),
   ),
   ...Object.fromEntries(
     Object.keys(SPREADSHEET_CONTENT_TYPES).map((ext) => [ext, 'spreadsheet' as const]),
@@ -163,7 +180,8 @@ export function isViewableFile(filename: string): boolean {
 }
 
 export function isTextFile(filename: string): boolean {
-  return getViewerKind(filename) === 'text';
+  const kind = getViewerKind(filename);
+  return kind === 'text' || kind === 'markdown' || kind === 'latex';
 }
 
 export function isPdfFile(filename: string): boolean {
@@ -178,14 +196,30 @@ export function isOfficeFile(filename: string): boolean {
   return getViewerKind(filename) === 'office';
 }
 
+export function isMarkdownFile(filename: string): boolean {
+  return getViewerKind(filename) === 'markdown';
+}
+
+export function isLatexFile(filename: string): boolean {
+  return getViewerKind(filename) === 'latex';
+}
+
 export function getTextContentType(filename: string): string {
-  return TEXT_CONTENT_TYPES[getExtension(filename)] ?? 'text/plain; charset=utf-8';
+  const ext = getExtension(filename);
+  return (
+    TEXT_CONTENT_TYPES[ext] ??
+    MARKDOWN_CONTENT_TYPES[ext] ??
+    LATEX_CONTENT_TYPES[ext] ??
+    'text/plain; charset=utf-8'
+  );
 }
 
 export function getViewerContentType(filename: string): string {
   const ext = getExtension(filename);
   const kind = getViewerKind(filename);
-  if (kind === 'text') return getTextContentType(filename);
+  if (kind === 'text' || kind === 'markdown' || kind === 'latex') {
+    return getTextContentType(filename);
+  }
   if (kind === 'pdf') return 'application/pdf';
   if (kind === 'spreadsheet') {
     return SPREADSHEET_CONTENT_TYPES[ext] ?? 'application/octet-stream';

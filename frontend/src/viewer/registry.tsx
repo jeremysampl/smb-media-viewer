@@ -1,5 +1,7 @@
 import type { ComponentType } from 'react';
 import type { ViewerKind } from '../types';
+import { LatexFileViewer } from './latex/LatexFileViewer';
+import { MarkdownFileViewer } from './markdown/MarkdownFileViewer';
 import { OfficeFileViewer } from './office/OfficeFileViewer';
 import { PdfFileViewer } from './pdf/PdfFileViewer';
 import { SpreadsheetFileViewer } from './spreadsheet/SpreadsheetFileViewer';
@@ -18,6 +20,8 @@ const VIEWERS: Record<ViewerKind, ComponentType<FileViewerProps>> = {
   pdf: PdfFileViewer,
   spreadsheet: SpreadsheetFileViewer,
   office: OfficeFileViewer,
+  markdown: MarkdownFileViewer,
+  latex: LatexFileViewer,
 };
 
 export function getFileViewer(

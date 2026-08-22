@@ -68,10 +68,11 @@
 .file-viewer-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: var(--space-2);
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .file-viewer-tool {
@@ -158,6 +159,164 @@
   will-change: transform;
 }
 
+.viewer-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.15rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.viewer-mode-btn {
+  margin: 0;
+  padding: 0.3rem 0.7rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.viewer-mode-btn.active {
+  background: var(--color-accent-fill);
+  color: var(--color-text-strong);
+}
+
+.file-viewer-panel-doc {
+  width: min(900px, 100%);
+}
+
+.doc-preview {
+  margin: 0;
+  padding: 1.25rem 1.35rem 1.75rem;
+  color: var(--color-text);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.doc-preview > *:first-child {
+  margin-top: 0;
+}
+
+.doc-preview h1,
+.doc-preview h2,
+.doc-preview h3,
+.doc-preview h4 {
+  line-height: 1.3;
+  margin: 1.25em 0 0.5em;
+}
+
+.doc-preview p,
+.doc-preview ul,
+.doc-preview ol,
+.doc-preview blockquote,
+.doc-preview pre {
+  margin: 0.75em 0;
+}
+
+.doc-preview a {
+  color: var(--color-accent-soft);
+}
+
+.doc-preview code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.doc-preview pre {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.35);
+  overflow: auto;
+}
+
+.doc-preview pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.doc-preview blockquote {
+  margin-left: 0;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--color-border-accent);
+  color: var(--color-text-soft);
+}
+
+.doc-preview img,
+.latex-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.85em 0;
+  border-radius: var(--radius-sm);
+}
+
+.doc-missing-image {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.latex-figure {
+  margin: 1em 0;
+}
+
+.latex-figure figcaption {
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+  text-align: center;
+}
+
+.annotationLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.annotationLayer a {
+  position: absolute;
+  display: block;
+  pointer-events: auto;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  cursor: pointer;
+}
+
+.annotationLayer a:hover {
+  background: rgba(61, 123, 255, 0.12);
+  outline: 1px solid rgba(61, 123, 255, 0.45);
+}
+
+.doc-preview th,
+.doc-preview td {
+  border: 1px solid var(--color-border);
+  padding: 0.4rem 0.55rem;
+}
+
+.latex-preview .latex-title {
+  text-align: center;
+  font-size: 1.6rem;
+}
+
+.latex-preview .latex-author,
+.latex-preview .latex-date {
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.latex-preview .katex-display {
+  margin: 1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .pdf-page {
   background: var(--color-paper);
   box-shadow: 0 8px 28px var(--color-shadow);
@@ -233,9 +392,25 @@
 
 .spreadsheet-viewer-body {
   background: #0c1018;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.spreadsheet-viewer-body > .file-viewer-status,
+.spreadsheet-viewer-body > .file-viewer-error {
+  flex: 0 0 auto;
+}
+
+.spreadsheet-viewer-body > .file-viewer-text {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
 }
 
 .spreadsheet-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: var(--space-4);
   overflow: auto;
   -webkit-overflow-scrolling: touch;
