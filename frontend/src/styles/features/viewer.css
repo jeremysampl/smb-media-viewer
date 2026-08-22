@@ -249,6 +249,43 @@
   color: var(--color-text-soft);
 }
 
+.file-viewer-panel-code {
+  width: min(1100px, 100%);
+}
+
+.code-viewer-body {
+  background: #0d1117;
+}
+
+.code-viewer-body > .file-viewer-text {
+  color: #e6edf3;
+}
+
+.code-preview {
+  margin: 0;
+  min-height: 100%;
+}
+
+.code-preview pre.shiki,
+.code-preview pre {
+  margin: 0;
+  padding: 1rem 1.1rem 1.5rem;
+  overflow: visible;
+  background: transparent !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.code-preview code {
+  font: inherit;
+  background: transparent !important;
+  padding: 0;
+}
+
 .doc-preview img,
 .latex-image {
   max-width: 100%;

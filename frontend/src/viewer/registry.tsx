@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { ViewerKind } from '../types';
+import { CodeFileViewer } from './code/CodeFileViewer';
 import { LatexFileViewer } from './latex/LatexFileViewer';
 import { MarkdownFileViewer } from './markdown/MarkdownFileViewer';
 import { OfficeFileViewer } from './office/OfficeFileViewer';
@@ -22,6 +23,7 @@ const VIEWERS: Record<ViewerKind, ComponentType<FileViewerProps>> = {
   office: OfficeFileViewer,
   markdown: MarkdownFileViewer,
   latex: LatexFileViewer,
+  code: CodeFileViewer,
 };
 
 export function getFileViewer(

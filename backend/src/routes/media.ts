@@ -329,7 +329,7 @@ router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    if (viewer === 'text' || viewer === 'markdown' || viewer === 'latex') {
+    if (viewer === 'text' || viewer === 'markdown' || viewer === 'latex' || viewer === 'code') {
       if (stats.size > TEXT_VIEW_MAX_BYTES) {
         res.status(413).json({
           error: `File is too large to preview (max ${Math.round(TEXT_VIEW_MAX_BYTES / (1024 * 1024))} MB)`,

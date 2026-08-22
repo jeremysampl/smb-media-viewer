@@ -11,7 +11,14 @@ export type MediaType = 'image' | 'video';
 export type EntryType = 'folder' | MediaType | 'file';
 
 /** Non-media overlay viewers. Keep in sync with frontend ViewerKind. */
-export type ViewerKind = 'text' | 'pdf' | 'spreadsheet' | 'office' | 'markdown' | 'latex';
+export type ViewerKind =
+  | 'text'
+  | 'pdf'
+  | 'spreadsheet'
+  | 'office'
+  | 'markdown'
+  | 'latex'
+  | 'code';
 
 export interface ShareInfo {
   name: string;
