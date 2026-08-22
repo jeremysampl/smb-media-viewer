@@ -41,7 +41,7 @@ const VIDEO_EXTENSIONS = new Set([
  * Viewer kinds for non-media files. Add a kind here, map extensions below,
  * then register a frontend viewer for that kind.
  */
-export type ViewerKind = 'text' | 'pdf';
+export type ViewerKind = 'text' | 'pdf' | 'spreadsheet' | 'office';
 
 const TEXT_CONTENT_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
@@ -90,10 +90,33 @@ const TEXT_CONTENT_TYPES: Record<string, string> = {
   '.editorconfig': 'text/plain; charset=utf-8',
 };
 
+const SPREADSHEET_CONTENT_TYPES: Record<string, string> = {
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.xlsm': 'application/vnd.ms-excel.sheet.macroEnabled.12',
+  '.xlsb': 'application/vnd.ms-excel.sheet.binary.macroEnabled.12',
+  '.xls': 'application/vnd.ms-excel',
+  '.ods': 'application/vnd.oasis.opendocument.spreadsheet',
+};
+
+const OFFICE_CONTENT_TYPES: Record<string, string> = {
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.odt': 'application/vnd.oasis.opendocument.text',
+  '.ppt': 'application/vnd.ms-powerpoint',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.odp': 'application/vnd.oasis.opendocument.presentation',
+};
+
 /** extension → viewer kind. Grow this map as new viewers ship. */
 const VIEWER_BY_EXTENSION: Record<string, ViewerKind> = {
   ...Object.fromEntries(
     Object.keys(TEXT_CONTENT_TYPES).map((ext) => [ext, 'text' as const]),
+  ),
+  ...Object.fromEntries(
+    Object.keys(SPREADSHEET_CONTENT_TYPES).map((ext) => [ext, 'spreadsheet' as const]),
+  ),
+  ...Object.fromEntries(
+    Object.keys(OFFICE_CONTENT_TYPES).map((ext) => [ext, 'office' as const]),
   ),
   '.pdf': 'pdf',
 };
@@ -147,14 +170,29 @@ export function isPdfFile(filename: string): boolean {
   return getViewerKind(filename) === 'pdf';
 }
 
+export function isSpreadsheetFile(filename: string): boolean {
+  return getViewerKind(filename) === 'spreadsheet';
+}
+
+export function isOfficeFile(filename: string): boolean {
+  return getViewerKind(filename) === 'office';
+}
+
 export function getTextContentType(filename: string): string {
   return TEXT_CONTENT_TYPES[getExtension(filename)] ?? 'text/plain; charset=utf-8';
 }
 
 export function getViewerContentType(filename: string): string {
+  const ext = getExtension(filename);
   const kind = getViewerKind(filename);
   if (kind === 'text') return getTextContentType(filename);
   if (kind === 'pdf') return 'application/pdf';
+  if (kind === 'spreadsheet') {
+    return SPREADSHEET_CONTENT_TYPES[ext] ?? 'application/octet-stream';
+  }
+  if (kind === 'office') {
+    return OFFICE_CONTENT_TYPES[ext] ?? 'application/octet-stream';
+  }
   return 'application/octet-stream';
 }
 

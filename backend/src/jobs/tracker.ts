@@ -4,7 +4,8 @@ export type TrackedJobKind =
   | 'image_resize'
   | 'video_transcode'
   | 'image_index'
-  | 'video_index';
+  | 'video_index'
+  | 'office_convert';
 
 export type TrackedJobOutcome = 'completed' | 'failed';
 

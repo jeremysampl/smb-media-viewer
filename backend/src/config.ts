@@ -55,4 +55,5 @@ export const config = {
   indexConcurrency: Math.max(1, Number(process.env.INDEX_CONCURRENCY ?? 2)),
   tokenSecret: requireEnv('TOKEN_SECRET', 'change-me-token-secret'),
   frontendOrigin,
+  libreOfficeBin: process.env.LIBREOFFICE_BIN ?? 'soffice',
 };

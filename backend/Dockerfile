@@ -19,6 +19,7 @@ WORKDIR /app
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg smbclient samba-common-bin ca-certificates \
+    libreoffice-writer libreoffice-impress \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json* ./

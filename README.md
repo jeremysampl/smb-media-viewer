@@ -5,7 +5,7 @@ Self-hosted media gallery for OpenMediaVault NAS shares. Users sign in with thei
 ## Architecture
 
 - **Frontend**: React + Vite SPA served by Nginx
-- **Backend**: Node.js + Express API with Sharp (images) and ffmpeg (video transcodes)
+- **Backend**: Node.js + Express API with Sharp (images), ffmpeg (video transcodes), and LibreOffice (Office document previews)
 - **Auth**: Validates credentials against the host Samba service via `smbclient`
 - **Permissions**: Parsed from `/etc/samba/smb.conf` plus `/etc/group`
 - **Containers**: Separate Docker images for frontend and backend
@@ -130,6 +130,7 @@ No extra secrets are required for GHCR from Actions in this repo (`GITHUB_TOKEN`
 The production setup expects Samba (`smbclient`) and `/etc/samba/smb.conf` on the NAS. For local UI and media-pipeline testing, use **local dev mode**:
 
 1. Install [ffmpeg](https://ffmpeg.org/) on your machine (required for video thumbnails/transcodes).
+   For Word/PowerPoint previews, install LibreOffice (`soffice` on PATH).
 
 2. Copy the local env file and add test media:
 
@@ -180,7 +181,7 @@ npm install
 npm run dev
 ```
 
-Requires `ffmpeg` and `smbclient` on the host for local auth tests.
+Requires `ffmpeg` and `smbclient` on the host for local auth tests. Office previews also need LibreOffice (`soffice`).
 
 ### Frontend
 
@@ -202,6 +203,8 @@ Vite proxies `/api` to `http://localhost:3001`.
 - `GET /api/media/:token/image?quality=medium` - Resized image
 - `GET /api/media/:token/video?quality=medium` - Transcoded/streamed video (Range supported)
 - `GET /api/media/:token/poster` - Video thumbnail
+- `GET /api/media/:token/raw` - Text, PDF, or spreadsheet bytes for in-browser viewers
+- `GET /api/media/:token/pdf-preview` - Office document converted to PDF (cached; requires LibreOffice)
 
 Media tokens are signed and scoped to the authenticated user.
 

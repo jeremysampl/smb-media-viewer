@@ -159,14 +159,112 @@
 }
 
 .pdf-page {
-  background: #fff;
+  background: var(--color-paper);
   box-shadow: 0 8px 28px var(--color-shadow);
   line-height: 0;
+}
+
+.pdf-page-layer {
+  position: relative;
+  margin: 0 auto;
 }
 
 .pdf-page-canvas {
   display: block;
   max-width: none;
+}
+
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-size-adjust: none;
+  user-select: text;
+  pointer-events: auto;
+}
+
+.textLayer span,
+.textLayer br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+}
+
+.textLayer ::selection {
+  background: rgba(61, 123, 255, 0.35);
+}
+
+.file-viewer-panel-spreadsheet {
+  width: min(1100px, 100%);
+}
+
+.spreadsheet-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0 var(--space-5) var(--space-3);
+  border-bottom: 1px solid var(--color-border-soft);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.spreadsheet-tab {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spreadsheet-tab.active {
+  color: var(--color-text-strong);
+  border-color: var(--color-border-accent);
+  background: var(--color-accent-fill);
+}
+
+.spreadsheet-viewer-body {
+  background: #0c1018;
+}
+
+.spreadsheet-table-wrap {
+  padding: var(--space-4);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.spreadsheet-table-wrap table {
+  border-collapse: collapse;
+  min-width: 100%;
+  background: var(--color-paper);
+  color: #1a2433;
+  font-size: 0.86rem;
+}
+
+.spreadsheet-table-wrap th,
+.spreadsheet-table-wrap td {
+  border: 1px solid #d7deea;
+  padding: 0.35rem 0.55rem;
+  white-space: nowrap;
+  max-width: 24rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spreadsheet-table-wrap th {
+  background: #eef3ff;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .pdf-print-frame {

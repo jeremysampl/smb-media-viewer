@@ -8,6 +8,7 @@ import {
 import {
   GlobalWorkerOptions,
   getDocument,
+  TextLayer,
   type PDFDocumentProxy,
 } from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -17,6 +18,11 @@ import { IconButton } from '../../ui';
 import type { FileViewerProps } from '../types';
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
+
+export interface PdfFileViewerProps extends FileViewerProps {
+  fetchBlob?: (token: string) => Promise<Blob>;
+  loadingMessage?: string;
+}
 
 const MIN_SCALE = 0.4;
 const MAX_SCALE = 4;
@@ -54,6 +60,7 @@ function PdfPage({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(pageNumber <= 2);
   const [height, setHeight] = useState(240);
 
@@ -74,6 +81,7 @@ function PdfPage({
     if (!visible) return undefined;
     let cancelled = false;
     let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
+    let textLayer: TextLayer | null = null;
 
     void (async () => {
       const page = await pdf.getPage(pageNumber);
@@ -105,12 +113,34 @@ function PdfPage({
       } catch {
         // Cancelled when scale changes mid-render.
       }
+
+      if (cancelled) return;
+      const textHost = textLayerRef.current;
+      if (!textHost) return;
+      textHost.replaceChildren();
+      const textContent = await page.getTextContent();
+      if (cancelled) return;
+      textLayer = new TextLayer({
+        textContentSource: textContent,
+        container: textHost,
+        viewport,
+      });
+      try {
+        await textLayer.render();
+      } catch {
+        // Cancelled when scale changes mid-render.
+      }
     })();
 
     return () => {
       cancelled = true;
       try {
         renderTask?.cancel();
+      } catch {
+        // already finished
+      }
+      try {
+        textLayer?.cancel();
       } catch {
         // already finished
       }
@@ -124,12 +154,20 @@ function PdfPage({
       style={{ minHeight: height }}
       data-page={pageNumber}
     >
-      <canvas ref={canvasRef} className="pdf-page-canvas" />
+      <div className="pdf-page-layer" style={{ width: '100%', height }}>
+        <canvas ref={canvasRef} className="pdf-page-canvas" />
+        <div ref={textLayerRef} className="textLayer" />
+      </div>
     </div>
   );
 }
 
-export function PdfFileViewer({ entry, onClose }: FileViewerProps) {
+export function PdfFileViewer({
+  entry,
+  onClose,
+  fetchBlob = fetchRawBlob,
+  loadingMessage = 'Loading PDF…',
+}: PdfFileViewerProps) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState(0);
@@ -176,7 +214,7 @@ export function PdfFileViewer({ entry, onClose }: FileViewerProps) {
 
     void (async () => {
       try {
-        const blob = await fetchRawBlob(entry.token!);
+        const blob = await fetchBlob(entry.token!);
         if (cancelled) return;
         objectUrl = URL.createObjectURL(blob);
         setBlobUrl(objectUrl);
@@ -205,7 +243,7 @@ export function PdfFileViewer({ entry, onClose }: FileViewerProps) {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
       void doc?.destroy();
     };
-  }, [entry.token, entry.path]);
+  }, [entry.token, entry.path, fetchBlob]);
 
   const measureFitWidth = useCallback(async () => {
     if (!pdf || !bodyRef.current) return;
@@ -480,7 +518,7 @@ export function PdfFileViewer({ entry, onClose }: FileViewerProps) {
           ref={bodyRef}
           className={`file-viewer-body pdf-viewer-body${liveScale ? ' is-pinching' : ''}`}
         >
-          {loading ? <p className="file-viewer-status">Loading PDF…</p> : null}
+          {loading ? <p className="file-viewer-status">{loadingMessage}</p> : null}
           {error ? <p className="file-viewer-error">{error}</p> : null}
           {pdf ? (
             <div ref={pagesRef} className="pdf-pages">

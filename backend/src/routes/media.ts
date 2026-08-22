@@ -6,6 +6,7 @@ import { authMiddleware, type AuthenticatedRequest } from '../auth/middleware.js
 import { streamFileWithRange } from '../cache/cache.js';
 import { getResizedImage } from '../media/image.js';
 import { isQualityTier } from '../media/quality.js';
+import { getOfficePdf } from '../media/office.js';
 import { getVideoPoster } from '../media/poster.js';
 import { verifyMediaToken } from '../media/tokens.js';
 import { getTranscodedVideo } from '../media/video.js';
@@ -15,7 +16,9 @@ import {
   getViewerContentType,
   getViewerKind,
   isMediaFile,
+  isOfficeFile,
   isPdfFile,
+  isSpreadsheetFile,
   isTextFile,
 } from '../media/fileTypes.js';
 
@@ -24,6 +27,8 @@ const router = Router();
 /** Soft caps for in-browser previews (bytes). */
 const TEXT_VIEW_MAX_BYTES = 5 * 1024 * 1024;
 const PDF_VIEW_MAX_BYTES = 80 * 1024 * 1024;
+const SPREADSHEET_VIEW_MAX_BYTES = 25 * 1024 * 1024;
+const OFFICE_VIEW_MAX_BYTES = 50 * 1024 * 1024;
 
 function getTokenParam(value: string | string[]): string {
   return Array.isArray(value) ? value[0] : value;
@@ -131,7 +136,53 @@ router.get('/:token/metadata', async (req: AuthenticatedRequest, res) => {
 });
 
 /**
- * Stream a viewable non-media file (text, PDF, …).
+ * Convert an Office file to PDF (cached) for preview.
+ */
+router.get('/:token/pdf-preview', async (req: AuthenticatedRequest, res) => {
+  const sourcePath = await authorizeMedia(req, getTokenParam(req.params.token));
+  if (!sourcePath) {
+    res.status(404).json({ error: 'File not found' });
+    return;
+  }
+
+  const basename = path.basename(sourcePath);
+  if (!isOfficeFile(basename)) {
+    res.status(400).json({ error: 'Not an Office document' });
+    return;
+  }
+
+  try {
+    const stats = await fsp.stat(sourcePath);
+    if (!stats.isFile()) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+    if (stats.size > OFFICE_VIEW_MAX_BYTES) {
+      res.status(413).json({
+        error: `File is too large to preview (max ${Math.round(OFFICE_VIEW_MAX_BYTES / (1024 * 1024))} MB)`,
+      });
+      return;
+    }
+
+    const result = await getOfficePdf(sourcePath);
+    const outStats = await fsp.stat(result.filePath);
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('Content-Length', String(outStats.size));
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${basename.replace(/\.[^.]+$/, '.pdf').replace(/"/g, '')}"`,
+    );
+    fs.createReadStream(result.filePath).pipe(res);
+  } catch (error) {
+    console.error('Office PDF preview failed:', error);
+    const message = error instanceof Error ? error.message : 'Failed to convert document';
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * Stream a viewable non-media file (text, PDF, spreadsheet, …).
  * Some kinds are size-capped so huge files don't blow up the browser.
  */
 router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
@@ -145,6 +196,11 @@ router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
   const viewer = getViewerKind(basename);
   if (!viewer) {
     res.status(400).json({ error: 'This file type cannot be previewed' });
+    return;
+  }
+
+  if (viewer === 'office') {
+    res.status(400).json({ error: 'Use pdf-preview for Office documents' });
     return;
   }
 
@@ -177,12 +233,22 @@ router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
         });
         return;
       }
+    } else if (viewer === 'spreadsheet') {
+      if (!isSpreadsheetFile(sourcePath)) {
+        res.status(400).json({ error: 'Not a spreadsheet file' });
+        return;
+      }
+      if (stats.size > SPREADSHEET_VIEW_MAX_BYTES) {
+        res.status(413).json({
+          error: `Spreadsheet is too large to preview (max ${Math.round(SPREADSHEET_VIEW_MAX_BYTES / (1024 * 1024))} MB)`,
+        });
+        return;
+      }
     }
 
     res.setHeader('Content-Type', getViewerContentType(basename));
     res.setHeader('Content-Length', String(stats.size));
     res.setHeader('Cache-Control', 'private, max-age=300');
-    // Allow the PDF viewer to fetch this from a blob/print window context.
     res.setHeader('Content-Disposition', `inline; filename="${basename.replace(/"/g, '')}"`);
     fs.createReadStream(sourcePath).pipe(res);
   } catch (error) {

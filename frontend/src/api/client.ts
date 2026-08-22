@@ -95,7 +95,7 @@ export interface AdminStatus {
   };
   mediaJobs: Array<{
     id: string;
-    kind: 'image_resize' | 'video_transcode' | 'image_index' | 'video_index';
+    kind: 'image_resize' | 'video_transcode' | 'image_index' | 'video_index' | 'office_convert';
     label: string;
     path: string;
     size?: number;
@@ -107,7 +107,7 @@ export interface AdminStatus {
   }>;
   recentJobs: Array<{
     id: string;
-    kind: 'image_resize' | 'video_transcode' | 'image_index' | 'video_index';
+    kind: 'image_resize' | 'video_transcode' | 'image_index' | 'video_index' | 'office_convert';
     label: string;
     path: string;
     size?: number;
@@ -237,11 +237,11 @@ export async function getQualityProfiles(): Promise<{ profiles: QualityProfile[]
 
 export function mediaUrl(
   token: string,
-  kind: 'image' | 'video' | 'poster' | 'raw',
+  kind: 'image' | 'video' | 'poster' | 'raw' | 'pdf-preview',
   quality?: string,
 ): string {
   const base = `${API_BASE}/media/${token}/${kind}`;
-  if (kind === 'poster' || kind === 'raw') return base;
+  if (kind === 'poster' || kind === 'raw' || kind === 'pdf-preview') return base;
   return `${base}?quality=${quality ?? 'medium'}`;
 }
 
@@ -265,6 +265,18 @@ export async function fetchRawBlob(token: string): Promise<Blob> {
     const body = await response.json().catch(() => ({}));
     const message = (body as { error?: string }).error ?? response.statusText;
     throw new Error(message || 'Failed to load file');
+  }
+  return response.blob();
+}
+
+export async function fetchOfficePdfBlob(token: string): Promise<Blob> {
+  const response = await fetch(mediaUrl(token, 'pdf-preview'), {
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const message = (body as { error?: string }).error ?? response.statusText;
+    throw new Error(message || 'Failed to convert document');
   }
   return response.blob();
 }

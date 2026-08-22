@@ -38,6 +38,8 @@ function jobKindLabel(kind: string): string {
     case 'video_index':
     case 'video':
       return 'Video index';
+    case 'office_convert':
+      return 'Office to PDF';
     default:
       return kind;
   }

@@ -55,7 +55,7 @@ function inferKindFromPath(cachePath: string): 'image' | 'video' | 'unknown' {
 export function registerCacheEntry(input: {
   cachePath: string;
   sourcePath: string;
-  kind: 'image' | 'video';
+  kind: 'image' | 'video' | 'unknown';
   quality: string;
   size: number;
 }): void {
