@@ -32,6 +32,7 @@ const TEXT_VIEW_MAX_BYTES = 5 * 1024 * 1024;
 const PDF_VIEW_MAX_BYTES = 80 * 1024 * 1024;
 const SPREADSHEET_VIEW_MAX_BYTES = 25 * 1024 * 1024;
 const OFFICE_VIEW_MAX_BYTES = 50 * 1024 * 1024;
+const AUDIO_VIEW_MAX_BYTES = 500 * 1024 * 1024;
 
 const IMAGE_EXTENSION_FALLBACKS = [
   '.png',
@@ -358,6 +359,24 @@ router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
         });
         return;
       }
+    } else if (viewer === 'audio') {
+      if (stats.size > AUDIO_VIEW_MAX_BYTES) {
+        res.status(413).json({
+          error: `Audio file is too large to play (max ${Math.round(AUDIO_VIEW_MAX_BYTES / (1024 * 1024))} MB)`,
+        });
+        return;
+      }
+
+      const contentType = getViewerContentType(basename);
+      const ranged = streamFileWithRange(sourcePath, req.headers.range, contentType);
+      res.status(ranged.status);
+      for (const [key, value] of Object.entries(ranged.headers)) {
+        res.setHeader(key, value);
+      }
+      res.setHeader('Cache-Control', 'private, max-age=300');
+      res.setHeader('Content-Disposition', `inline; filename="${basename.replace(/"/g, '')}"`);
+      ranged.stream.pipe(res);
+      return;
     }
 
     res.setHeader('Content-Type', getViewerContentType(basename));

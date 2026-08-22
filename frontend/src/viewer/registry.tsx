@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { ViewerKind } from '../types';
+import { AudioFileViewer } from './audio/AudioFileViewer';
 import { CodeFileViewer } from './code/CodeFileViewer';
 import { LatexFileViewer } from './latex/LatexFileViewer';
 import { MarkdownFileViewer } from './markdown/MarkdownFileViewer';
@@ -24,6 +25,7 @@ const VIEWERS: Record<ViewerKind, ComponentType<FileViewerProps>> = {
   markdown: MarkdownFileViewer,
   latex: LatexFileViewer,
   code: CodeFileViewer,
+  audio: AudioFileViewer,
 };
 
 export function getFileViewer(

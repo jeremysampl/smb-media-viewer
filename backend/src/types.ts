@@ -18,7 +18,8 @@ export type ViewerKind =
   | 'office'
   | 'markdown'
   | 'latex'
-  | 'code';
+  | 'code'
+  | 'audio';
 
 export interface ShareInfo {
   name: string;

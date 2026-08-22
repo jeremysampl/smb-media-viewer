@@ -256,9 +256,12 @@ const AUDIO_FORMATS = new Set([
   'WAV',
   'FLAC',
   'OGG',
+  'OGA',
   'OPUS',
   'WMA',
   'AIFF',
+  'AIF',
+  'WEBA',
 ]);
 
 const KNOWN_IMAGE_FORMATS = new Set(

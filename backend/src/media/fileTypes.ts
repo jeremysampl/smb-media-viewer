@@ -48,7 +48,8 @@ export type ViewerKind =
   | 'office'
   | 'markdown'
   | 'latex'
-  | 'code';
+  | 'code'
+  | 'audio';
 
 const TEXT_CONTENT_TYPES: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
@@ -228,6 +229,21 @@ const OFFICE_CONTENT_TYPES: Record<string, string> = {
   '.odp': 'application/vnd.oasis.opendocument.presentation',
 };
 
+const AUDIO_CONTENT_TYPES: Record<string, string> = {
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.wav': 'audio/wav',
+  '.flac': 'audio/flac',
+  '.ogg': 'audio/ogg',
+  '.oga': 'audio/ogg',
+  '.opus': 'audio/ogg',
+  '.wma': 'audio/x-ms-wma',
+  '.aiff': 'audio/aiff',
+  '.aif': 'audio/aiff',
+  '.weba': 'audio/webm',
+};
+
 /** extension → viewer kind. Grow this map as new viewers ship. */
 const VIEWER_BY_EXTENSION: Record<string, ViewerKind> = {
   ...Object.fromEntries(
@@ -247,6 +263,9 @@ const VIEWER_BY_EXTENSION: Record<string, ViewerKind> = {
   ),
   ...Object.fromEntries(
     Object.keys(OFFICE_CONTENT_TYPES).map((ext) => [ext, 'office' as const]),
+  ),
+  ...Object.fromEntries(
+    Object.keys(AUDIO_CONTENT_TYPES).map((ext) => [ext, 'audio' as const]),
   ),
   '.pdf': 'pdf',
 };
@@ -332,6 +351,10 @@ export function isCodeFile(filename: string): boolean {
   return getViewerKind(filename) === 'code';
 }
 
+export function isAudioFile(filename: string): boolean {
+  return getViewerKind(filename) === 'audio';
+}
+
 export function getTextContentType(filename: string): string {
   const base = filename.includes('/')
     ? filename.slice(filename.lastIndexOf('/') + 1)
@@ -361,6 +384,9 @@ export function getViewerContentType(filename: string): string {
   }
   if (kind === 'office') {
     return OFFICE_CONTENT_TYPES[ext] ?? 'application/octet-stream';
+  }
+  if (kind === 'audio') {
+    return AUDIO_CONTENT_TYPES[ext] ?? 'application/octet-stream';
   }
   return 'application/octet-stream';
 }
