@@ -217,7 +217,7 @@ function getActiveImage(stage: HTMLDivElement | null, activeIndex: number) {
 
 function getActiveVideoPoster(stage: HTMLDivElement | null, activeIndex: number) {
   return getActiveSlide(stage, activeIndex)?.querySelector(
-    '.mobile-gallery-video-poster',
+    '.gallery-thumb-overlay-host__img',
   ) as HTMLImageElement | null;
 }
 

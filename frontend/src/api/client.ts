@@ -247,6 +247,23 @@ export function mediaUrl(
   return `${base}?quality=${quality ?? 'medium'}`;
 }
 
+export type VideoTranscodeStatus = {
+  state: 'ready' | 'processing' | 'missing';
+  progress: number | null;
+};
+
+export async function fetchVideoStatus(
+  token: string,
+  quality: string,
+  options?: { prepare?: boolean; signal?: AbortSignal },
+): Promise<VideoTranscodeStatus> {
+  const params = new URLSearchParams({ quality });
+  if (options?.prepare) params.set('prepare', '1');
+  return request(`/media/${token}/video-status?${params}`, {
+    signal: options?.signal,
+  });
+}
+
 export async function fetchRawText(token: string): Promise<string> {
   const response = await fetch(mediaUrl(token, 'raw'), {
     credentials: 'include',

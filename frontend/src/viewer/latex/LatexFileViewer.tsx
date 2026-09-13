@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchRawText } from '../../api/client';
-import { CloseIcon, IconButton } from '../../ui';
+import { CloseIcon, IconButton, Loader } from '../../ui';
 import {
   PreviewSourceToggle,
   type PreviewMode,
@@ -68,7 +68,7 @@ export function LatexFileViewer({ entry, onClose }: FileViewerProps) {
           </div>
         </header>
         <div className="file-viewer-body">
-          {loading ? <p className="file-viewer-status">Loading…</p> : null}
+          {loading ? <Loader label="Loading…" /> : null}
           {error ? <p className="file-viewer-error">{error}</p> : null}
           {text !== null && mode === 'source' ? (
             <pre className="file-viewer-text">

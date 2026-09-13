@@ -10,7 +10,7 @@ import { isQualityTier } from '../media/quality.js';
 import { getOfficePdf } from '../media/office.js';
 import { getVideoPoster } from '../media/poster.js';
 import { verifyMediaToken } from '../media/tokens.js';
-import { getTranscodedVideo } from '../media/video.js';
+import { getTranscodedVideo, ensureTranscodedVideo, getVideoTranscodeStatus } from '../media/video.js';
 import { getMediaMetadata } from '../media/metadata.js';
 import { resolveShareForPath } from '../permissions/resolver.js';
 import {
@@ -152,6 +152,36 @@ router.get('/:token/video', async (req: AuthenticatedRequest, res) => {
   } catch (error) {
     console.error('Video processing failed:', error);
     res.status(500).json({ error: 'Failed to process video' });
+  }
+});
+
+router.get('/:token/video-status', async (req: AuthenticatedRequest, res) => {
+  const sourcePath = await authorizeMedia(req, getTokenParam(req.params.token));
+  if (!sourcePath) {
+    res.status(404).json({ error: 'Media not found' });
+    return;
+  }
+
+  const qualityParam = String(req.query.quality ?? 'medium');
+  const quality = isQualityTier(qualityParam) ? qualityParam : 'medium';
+  const prepare =
+    req.query.prepare === '1' ||
+    req.query.prepare === 'true' ||
+    req.query.prepare === 'yes';
+
+  try {
+    let status = await getVideoTranscodeStatus(sourcePath, quality);
+    if (status.state === 'missing' && prepare) {
+      ensureTranscodedVideo(sourcePath, quality);
+      status = await getVideoTranscodeStatus(sourcePath, quality);
+      if (status.state === 'missing') {
+        status = { state: 'processing', progress: null };
+      }
+    }
+    res.json(status);
+  } catch (error) {
+    console.error('Video status failed:', error);
+    res.status(500).json({ error: 'Failed to read video status' });
   }
 });
 

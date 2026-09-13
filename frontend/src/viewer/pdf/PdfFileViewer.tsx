@@ -19,6 +19,7 @@ import {
   CloseIcon,
   ExternalLinkIcon,
   IconButton,
+  Loader,
   MinusIcon,
   PlusIcon,
   PrintIcon,
@@ -773,7 +774,7 @@ export function PdfFileViewer({
           ref={bodyRef}
           className={`file-viewer-body pdf-viewer-body${liveScale ? ' is-pinching' : ''}`}
         >
-          {loading ? <p className="file-viewer-status">{loadingMessage}</p> : null}
+          {loading ? <Loader label={loadingMessage} /> : null}
           {error ? <p className="file-viewer-error">{error}</p> : null}
           {pdf ? (
             <div ref={pagesRef} className="pdf-pages">

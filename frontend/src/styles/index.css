@@ -4,6 +4,7 @@
 @import './primitives/forms.css';
 @import './primitives/select-field.css';
 @import './primitives/buttons.css';
+@import './primitives/loader.css';
 @import './primitives/overlays.css';
 @import './features/browser.css';
 @import './features/gallery.css';

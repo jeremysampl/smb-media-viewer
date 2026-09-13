@@ -12,8 +12,14 @@ import {
   setTrackedJobOutputSize,
   updateTrackedJobProgress,
   withTrackedJob,
+  findTrackedJob,
 } from '../jobs/tracker.js';
 import { registerCacheEntry, recordCacheAccess } from '../cache/meta.js';
+
+const inflight = new Map<
+  string,
+  Promise<{ filePath: string; contentType: string }>
+>();
 
 function probeDurationSeconds(sourcePath: string): Promise<number | null> {
   return new Promise((resolve) => {
@@ -90,6 +96,10 @@ export async function getTranscodedVideo(
   const stats = await fs.stat(sourcePath);
   const key = buildCacheKey(sourcePath, stats.mtimeMs, quality, 'video');
   const cachePath = getCachePath('videos', key, '.mp4');
+
+  const existing = inflight.get(cachePath);
+  if (existing) return existing;
+
   const cached = await readCacheEntry(cachePath);
   if (cached) {
     let size = stats.size;
@@ -109,12 +119,14 @@ export async function getTranscodedVideo(
     return { filePath: cached.filePath, contentType: 'video/mp4' };
   }
 
-  return withTrackedJob(
+  const promise = withTrackedJob(
     { kind: 'video_transcode', path: sourcePath, size: stats.size, quality },
     async (jobId) => {
       await ensureParentDir(cachePath);
       const profile = getQualityProfile(quality);
       const duration = await probeDurationSeconds(sourcePath);
+      // Write to a temp *.mp4 so ffmpeg can detect the container; rename when done
+      const tempPath = `${cachePath}.${process.pid}.${Date.now()}.part.mp4`;
       const args = ['-i', sourcePath, '-movflags', '+faststart'];
 
       if (profile.videoHeight) {
@@ -136,12 +148,22 @@ export async function getTranscodedVideo(
         args.push('-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k');
       }
 
-      args.push(cachePath);
-      await runFfmpeg(args, (outTime) => {
-        if (duration && duration > 0) {
-          updateTrackedJobProgress(jobId, outTime / duration);
+      args.push(tempPath);
+      try {
+        await runFfmpeg(args, (outTime) => {
+          if (duration && duration > 0) {
+            updateTrackedJobProgress(jobId, outTime / duration);
+          }
+        });
+        await fs.rename(tempPath, cachePath);
+      } catch (error) {
+        try {
+          await fs.unlink(tempPath);
+        } catch {
+          // ignore cleanup errors
         }
-      });
+        throw error;
+      }
 
       try {
         const outStats = await fs.stat(cachePath);
@@ -160,5 +182,51 @@ export async function getTranscodedVideo(
 
       return { filePath: cachePath, contentType: 'video/mp4' };
     },
-  );
+  ).finally(() => {
+    inflight.delete(cachePath);
+  });
+
+  inflight.set(cachePath, promise);
+  return promise;
+}
+
+export type VideoTranscodeStatus = {
+  state: 'ready' | 'processing' | 'missing';
+  progress: number | null;
+};
+
+export async function getVideoTranscodeStatus(
+  sourcePath: string,
+  quality: QualityTier,
+): Promise<VideoTranscodeStatus> {
+  const stats = await fs.stat(sourcePath);
+  const key = buildCacheKey(sourcePath, stats.mtimeMs, quality, 'video');
+  const cachePath = getCachePath('videos', key, '.mp4');
+
+  // Prefer in-flight / active job over any file on disk (partial encodes)
+  const job = findTrackedJob({
+    kind: 'video_transcode',
+    path: sourcePath,
+    quality,
+  });
+  if (job || inflight.has(cachePath)) {
+    return { state: 'processing', progress: job?.progress ?? null };
+  }
+
+  const cached = await readCacheEntry(cachePath);
+  if (cached) {
+    return { state: 'ready', progress: 1 };
+  }
+
+  return { state: 'missing', progress: null };
+}
+
+/** Start a transcode if needed; safe to call repeatedly */
+export function ensureTranscodedVideo(
+  sourcePath: string,
+  quality: QualityTier,
+): void {
+  void getTranscodedVideo(sourcePath, quality).catch((error) => {
+    console.error('Background video prepare failed:', error);
+  });
 }

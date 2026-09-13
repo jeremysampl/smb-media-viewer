@@ -5,6 +5,7 @@ export {
   type SelectFieldProps,
   type SelectFieldLayout,
 } from './SelectField';
+export { Loader, type LoaderProps } from './Loader';
 export {
   CloseIcon,
   ChevronDownIcon,

@@ -14,7 +14,9 @@ import { useQualityPreference } from '../browser/ResolutionSelector';
 import { SelectField } from '../ui';
 import { ChromeRasterImage } from './ChromeRasterImage';
 import { shouldUseChromeImageRaster } from './chromeImageRaster';
+import { GalleryThumbWithLoader } from './GalleryVideoLoader';
 import { MediaDetailsPanel } from './MediaDetailsPanel';
+import { useVideoPrepareStatus } from './useVideoPrepareStatus';
 
 interface DesktopLightboxProps {
   entries: BrowseEntry[];
@@ -106,17 +108,29 @@ function buildSlide(
   entry: BrowseEntry,
   useFull: boolean,
   quality: QualityTier,
-  size?: { width: number; height: number },
+  options?: {
+    size?: { width: number; height: number };
+    videoReady?: boolean;
+  },
 ): GallerySlide {
   const preview = previewFor(entry);
 
   if (entry.type === 'video' && entry.token) {
+    const poster = preview || mediaUrl(entry.token, 'poster');
+    // Only mark as a video slide once the MP4 is ready. Empty <video> sources
+    // make Firefox show "No video with supported format and MIME type found".
+    if (useFull && options?.videoReady) {
+      return {
+        type: 'video',
+        sources: [{ src: mediaUrl(entry.token, 'video', quality), type: 'video/mp4' }],
+        poster,
+        entryPath: entry.path,
+      };
+    }
     return {
-      type: 'video',
-      sources: useFull
-        ? [{ src: mediaUrl(entry.token, 'video', quality), type: 'video/mp4' }]
-        : [],
-      poster: preview || mediaUrl(entry.token, 'poster'),
+      src: poster,
+      alt: entry.name,
+      title: entry.name,
       entryPath: entry.path,
     };
   }
@@ -129,7 +143,7 @@ function buildSlide(
       : '',
     alt: entry.name,
     title: entry.name,
-    ...(size ? { width: size.width, height: size.height } : {}),
+    ...(options?.size ? { width: options.size.width, height: options.size.height } : {}),
     entryPath: entry.path,
   };
 }
@@ -217,6 +231,11 @@ export function DesktopLightbox({
   }, []);
 
   const currentEntry = mediaEntries[index];
+  const prepareCurrentVideo = useVideoPrepareStatus(
+    currentEntry?.type === 'video' ? currentEntry.token : undefined,
+    quality,
+    Boolean(open && currentEntry?.type === 'video' && currentEntry.token),
+  );
 
   // Keep a full-length slides array for YARL indexing, but only rebuild nearby slots.
   const slides = useMemo(() => {
@@ -231,17 +250,25 @@ export function DesktopLightbox({
       const entry = mediaEntries[slideIndex];
       if (!entry) continue;
       const useFull = hydratedPaths.has(entry.path);
-      slidesList[slideIndex] = buildSlide(
-        entry,
-        useFull,
-        quality,
-        imageSizeByPath[entry.path],
-      );
+      const isCurrentVideo =
+        entry.type === 'video' && entry.path === currentEntry?.path;
+      slidesList[slideIndex] = buildSlide(entry, useFull, quality, {
+        size: imageSizeByPath[entry.path],
+        videoReady: isCurrentVideo ? prepareCurrentVideo.ready : false,
+      });
     }
 
     // New array so YARL sees an update; elements reuse object identity for distant slides.
     return slidesList.slice();
-  }, [mediaEntries, quality, hydratedPaths, imageSizeByPath, index]);
+  }, [
+    mediaEntries,
+    quality,
+    hydratedPaths,
+    imageSizeByPath,
+    index,
+    currentEntry?.path,
+    prepareCurrentVideo.ready,
+  ]);
 
   return (
     <Lightbox
@@ -269,11 +296,34 @@ export function DesktopLightbox({
       animation={{ swipe: 500 }}
       render={{
         slide: ({ slide, rect, zoom }) => {
-          if (!useChromeRaster || !isImageSlide(slide)) return undefined;
           const entryPath =
             ('entryPath' in slide && typeof slide.entryPath === 'string'
               ? slide.entryPath
-              : null) ?? slide.src;
+              : null) ?? (isImageSlide(slide) ? slide.src : null);
+          const isPreparingVideo =
+            currentEntry?.type === 'video' &&
+            currentEntry.path === entryPath &&
+            prepareCurrentVideo.known &&
+            prepareCurrentVideo.processing &&
+            isImageSlide(slide);
+
+          if (isPreparingVideo) {
+            return (
+              <div
+                className="gallery-video-prepare-slide"
+                style={{ width: rect.width, height: rect.height }}
+              >
+                <GalleryThumbWithLoader
+                  src={slide.src}
+                  alt={slide.alt ?? currentEntry.name}
+                  showLoader
+                  progress={prepareCurrentVideo.progress}
+                />
+              </div>
+            );
+          }
+
+          if (!useChromeRaster || !isImageSlide(slide)) return undefined;
           return (
             <ChromeRasterImage
               variant="desktop"
@@ -284,7 +334,7 @@ export function DesktopLightbox({
               containerHeight={rect.height}
               zoom={zoom}
               onNaturalSize={(width, height) => {
-                rememberNaturalSize(entryPath, width, height);
+                rememberNaturalSize(entryPath ?? slide.src, width, height);
               }}
             />
           );

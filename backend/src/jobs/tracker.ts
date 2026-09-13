@@ -134,6 +134,20 @@ export function listTrackedJobs(): TrackedJob[] {
   return [...active.values()].sort((a, b) => a.startedAt - b.startedAt);
 }
 
+export function findTrackedJob(input: {
+  kind: TrackedJobKind;
+  path: string;
+  quality?: string;
+}): TrackedJob | undefined {
+  for (const job of active.values()) {
+    if (job.kind !== input.kind) continue;
+    if (job.path !== input.path) continue;
+    if (input.quality !== undefined && job.quality !== input.quality) continue;
+    return job;
+  }
+  return undefined;
+}
+
 export function listRecentJobs(): FinishedJob[] {
   return [...recent];
 }

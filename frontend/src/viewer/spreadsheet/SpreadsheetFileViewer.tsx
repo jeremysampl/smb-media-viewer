@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { fetchRawBlob, fetchRawText } from '../../api/client';
-import { CloseIcon, IconButton } from '../../ui';
+import { CloseIcon, IconButton, Loader } from '../../ui';
 import {
   PreviewSourceToggle,
   type PreviewMode,
@@ -124,7 +124,7 @@ export function SpreadsheetFileViewer({ entry, onClose }: FileViewerProps) {
           </div>
         ) : null}
         <div className="file-viewer-body spreadsheet-viewer-body">
-          {loading ? <p className="file-viewer-status">Loading spreadsheet…</p> : null}
+          {loading ? <Loader label="Loading spreadsheet…" /> : null}
           {error ? <p className="file-viewer-error">{error}</p> : null}
           {!loading && !error && mode === 'source' && rawText !== null ? (
             <pre className="file-viewer-text">
