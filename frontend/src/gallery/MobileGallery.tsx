@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { mediaUrl } from '../api/client';
 import type { BrowseEntry, QualityTier } from '../types';
 import { useQualityPreference } from '../browser/ResolutionSelector';
+import { SelectField } from '../ui';
 import { ChromeRasterImage } from './ChromeRasterImage';
 import { MediaDetailsPanel } from './MediaDetailsPanel';
 import { prefetchMediaMetadata } from './mediaMetadataCache';
@@ -94,21 +95,24 @@ function GalleryQualitySelect({
   onChange: (quality: QualityTier) => void;
 }) {
   return (
-    <label className="mobile-gallery-quality" onClick={(event) => event.stopPropagation()}>
-      <span className="sr-only">Quality</span>
-      <select
+    <div
+      className="mobile-gallery-quality"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <SelectField
+        label="Quality"
         value={quality}
-        aria-label="Quality"
-        onChange={(event) => onChange(event.target.value as QualityTier)}
+        layout="ghost"
         onClick={(event) => event.stopPropagation()}
+        onChange={(value) => onChange(value as QualityTier)}
       >
         {profiles.map((profile) => (
           <option key={profile.id} value={profile.id}>
             {profile.label}
           </option>
         ))}
-      </select>
-    </label>
+      </SelectField>
+    </div>
   );
 }
 
@@ -296,7 +300,14 @@ export function MobileGallery({
   const [hydratedPaths, setHydratedPaths] = useState<Set<string>>(() => new Set());
 
   const stageRef = useRef<HTMLDivElement>(null);
+  const detailsSheetRef = useRef<HTMLDivElement>(null);
   const touchRef = useRef<TouchState | null>(null);
+  const sheetTouchRef = useRef<{
+    startX: number;
+    startY: number;
+    offsetY: number;
+    dragging: boolean;
+  } | null>(null);
   const pinchRef = useRef<PinchState | null>(null);
   const mediaEntries = useMemo(
     () => entries.filter((entry) => entry.type === 'image' || entry.type === 'video'),
@@ -691,6 +702,8 @@ export function MobileGallery({
         event.preventDefault();
         const offsetX = touch.clientX - state.startX;
         const offsetY = touch.clientY - state.startY;
+        state.offsetX = offsetX;
+        state.offsetY = offsetY;
         const zoom = imageZoomRef.current;
         const context = getImageZoomContext(stageRef.current, indexRef.current);
         const nextZoom = clampImageZoom(
@@ -774,13 +787,16 @@ export function MobileGallery({
       touchRef.current = null;
       if (isClosingRef.current || isOpeningRef.current) return;
 
-      if (state.axis === 'pan') {
-        return;
-      }
-
       const duration = Date.now() - state.startTime;
       const moved =
         Math.abs(state.offsetX) > TAP_MOVE_LIMIT || Math.abs(state.offsetY) > TAP_MOVE_LIMIT;
+
+      if (state.axis === 'pan') {
+        if (!moved && duration < 320) {
+          setControlsVisible((value) => !value);
+        }
+        return;
+      }
 
       setIsDragging(false);
       setIsSheetDragging(false);
@@ -855,6 +871,75 @@ export function MobileGallery({
       stage.removeEventListener('touchcancel', onTouchEnd);
     };
   }, [open, completeHorizontalSwipe, onClose, runFlyoutClose, resetImageZoom, clampActiveImageZoom, prefetchNearbyDetails]);
+
+  useEffect(() => {
+    const sheet = detailsSheetRef.current;
+    if (!sheet || !open || !detailsOpen) return undefined;
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (isClosingRef.current || isOpeningRef.current) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      sheetTouchRef.current = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        offsetY: 0,
+        dragging: false,
+      };
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      const state = sheetTouchRef.current;
+      const touch = event.touches[0];
+      if (!state || !touch) return;
+
+      const offsetX = touch.clientX - state.startX;
+      const offsetY = touch.clientY - state.startY;
+      const scroller = sheet.querySelector(
+        '.image-details-panel-sheet',
+      ) as HTMLElement | null;
+      const atTop = !scroller || scroller.scrollTop <= 0;
+
+      if (!state.dragging) {
+        if (Math.abs(offsetX) < 8 && Math.abs(offsetY) < 8) return;
+        if (offsetY > 0 && Math.abs(offsetY) >= Math.abs(offsetX) && atTop) {
+          state.dragging = true;
+          setIsSheetDragging(true);
+        } else {
+          sheetTouchRef.current = null;
+          return;
+        }
+      }
+
+      event.preventDefault();
+      state.offsetY = Math.max(0, offsetY);
+      setSheetDragY(state.offsetY);
+    };
+
+    const onTouchEnd = () => {
+      const state = sheetTouchRef.current;
+      sheetTouchRef.current = null;
+      if (!state?.dragging) return;
+
+      setIsSheetDragging(false);
+      if (state.offsetY > DETAILS_OPEN_THRESHOLD) {
+        setDetailsOpen(false);
+      }
+      setSheetDragY(0);
+    };
+
+    sheet.addEventListener('touchstart', onTouchStart, { passive: true });
+    sheet.addEventListener('touchmove', onTouchMove, { passive: false });
+    sheet.addEventListener('touchend', onTouchEnd);
+    sheet.addEventListener('touchcancel', onTouchEnd);
+
+    return () => {
+      sheet.removeEventListener('touchstart', onTouchStart);
+      sheet.removeEventListener('touchmove', onTouchMove);
+      sheet.removeEventListener('touchend', onTouchEnd);
+      sheet.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [open, detailsOpen]);
 
   if (!open || !currentEntry) return null;
 
@@ -991,7 +1076,12 @@ export function MobileGallery({
             animateClose();
           }}
         >
-          <span aria-hidden="true">←</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M14.7 5.3 8 12l6.7 6.7 1.4-1.4L10.8 12l5.3-5.3-1.4-1.4Z"
+            />
+          </svg>
         </button>
         <div className="mobile-gallery-tools">
           <GalleryQualitySelect
@@ -1015,7 +1105,12 @@ export function MobileGallery({
               });
             }}
           >
-            <span aria-hidden="true">ⓘ</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 15h-2v-6h2Zm0-8h-2V7h2Z"
+              />
+            </svg>
           </button>
         </div>
       </div>
@@ -1060,6 +1155,7 @@ export function MobileGallery({
       ) : null}
 
       <div
+        ref={detailsSheetRef}
         className={`mobile-gallery-details-sheet${showDetailsSheet ? ' visible' : ''}`}
         aria-hidden={!showDetailsSheet}
       >

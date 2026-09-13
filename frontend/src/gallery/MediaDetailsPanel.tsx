@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { MediaMetadata } from '../types';
-import { Button } from '../ui';
+import { Button, CloseIcon } from '../ui';
 import {
   getCachedMediaMetadata,
   loadMediaMetadata,
@@ -52,115 +52,208 @@ function formatLocation(location?: MediaMetadata['location']): string {
   return coords;
 }
 
+function isEmptyValue(value: ReactNode): boolean {
+  return value == null || value === '' || value === '—';
+}
+
+interface DetailItem {
+  label: string;
+  value: ReactNode;
+  hideIfEmpty?: boolean;
+}
+
+function DetailSection({ title, items }: { title: string; items: DetailItem[] }) {
+  const visible = items.filter(
+    (item) => !item.hideIfEmpty || !isEmptyValue(item.value),
+  );
+  if (visible.length === 0) return null;
+
+  return (
+    <section className="image-details-section">
+      <h3 className="image-details-section-title">{title}</h3>
+      <div className="image-details-rows">
+        {visible.map((item) => (
+          <div key={item.label} className="image-details-row">
+            <span className="image-details-row-label">{item.label}</span>
+            <span className="image-details-row-value">{item.value}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function LocationValue({ location }: { location?: MediaMetadata['location'] }) {
+  if (!location) return '—';
+  return (
+    <a
+      href={`https://www.openstreetmap.org/?mlat=${location.latitude}&mlon=${location.longitude}#map=15/${location.latitude}/${location.longitude}`}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {formatLocation(location)}
+    </a>
+  );
+}
+
 function MetadataFields({ metadata }: { metadata: MediaMetadata }) {
   if (metadata.kind === 'image') {
+    const cameraName = metadata.camera
+      ? [metadata.camera.make, metadata.camera.model].filter(Boolean).join(' ')
+      : '';
+
     return (
-      <dl className="image-details-list">
-        <dt>File</dt>
-        <dd>{metadata.filename}</dd>
-        <dt>Size</dt>
-        <dd>{formatSize(metadata.size)}</dd>
-        <dt>Modified</dt>
-        <dd>{formatDate(metadata.mtime)}</dd>
-        <dt>Dimensions</dt>
-        <dd>
-          {metadata.dimensions
-            ? `${metadata.dimensions.width} × ${metadata.dimensions.height}`
-            : '—'}
-        </dd>
-        <dt>Format</dt>
-        <dd>{metadata.format ?? '—'}</dd>
-        <dt>Captured</dt>
-        <dd>{formatDate(metadata.captureTime)}</dd>
-        <dt>Camera</dt>
-        <dd>
-          {metadata.camera
-            ? [metadata.camera.make, metadata.camera.model].filter(Boolean).join(' ') || '—'
-            : '—'}
-        </dd>
-        <dt>Lens</dt>
-        <dd>{metadata.camera?.lens ?? '—'}</dd>
-        <dt>Location</dt>
-        <dd>
-          {metadata.location ? (
-            <a
-              href={`https://www.openstreetmap.org/?mlat=${metadata.location.latitude}&mlon=${metadata.location.longitude}#map=15/${metadata.location.latitude}/${metadata.location.longitude}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {formatLocation(metadata.location)}
-            </a>
-          ) : (
-            '—'
-          )}
-        </dd>
-        <dt>ISO</dt>
-        <dd>{metadata.settings?.iso ?? '—'}</dd>
-        <dt>Aperture</dt>
-        <dd>{metadata.settings?.aperture ?? '—'}</dd>
-        <dt>Shutter</dt>
-        <dd>{metadata.settings?.shutterSpeed ?? '—'}</dd>
-        <dt>Focal length</dt>
-        <dd>{metadata.settings?.focalLength ?? '—'}</dd>
-        <dt>Flash</dt>
-        <dd>{metadata.settings?.flash ?? '—'}</dd>
-        <dt>White balance</dt>
-        <dd>{metadata.settings?.whiteBalance ?? '—'}</dd>
-        <dt>Software</dt>
-        <dd>{metadata.software ?? '—'}</dd>
-      </dl>
+      <div className="image-details-sections">
+        <DetailSection
+          title="File"
+          items={[
+            { label: 'Name', value: metadata.filename },
+            { label: 'Size', value: formatSize(metadata.size) },
+            { label: 'Modified', value: formatDate(metadata.mtime) },
+            {
+              label: 'Dimensions',
+              value: metadata.dimensions
+                ? `${metadata.dimensions.width} × ${metadata.dimensions.height}`
+                : '—',
+            },
+            { label: 'Format', value: metadata.format ?? '—', hideIfEmpty: true },
+          ]}
+        />
+        <DetailSection
+          title="Capture"
+          items={[
+            {
+              label: 'Taken',
+              value: formatDate(metadata.captureTime),
+              hideIfEmpty: true,
+            },
+            {
+              label: 'Software',
+              value: metadata.software ?? '—',
+              hideIfEmpty: true,
+            },
+          ]}
+        />
+        <DetailSection
+          title="Camera"
+          items={[
+            { label: 'Body', value: cameraName || '—', hideIfEmpty: true },
+            { label: 'Lens', value: metadata.camera?.lens ?? '—', hideIfEmpty: true },
+            { label: 'ISO', value: metadata.settings?.iso ?? '—', hideIfEmpty: true },
+            {
+              label: 'Aperture',
+              value: metadata.settings?.aperture ?? '—',
+              hideIfEmpty: true,
+            },
+            {
+              label: 'Shutter',
+              value: metadata.settings?.shutterSpeed ?? '—',
+              hideIfEmpty: true,
+            },
+            {
+              label: 'Focal length',
+              value: metadata.settings?.focalLength ?? '—',
+              hideIfEmpty: true,
+            },
+            { label: 'Flash', value: metadata.settings?.flash ?? '—', hideIfEmpty: true },
+            {
+              label: 'White balance',
+              value: metadata.settings?.whiteBalance ?? '—',
+              hideIfEmpty: true,
+            },
+          ]}
+        />
+        <DetailSection
+          title="Location"
+          items={
+            metadata.location
+              ? [
+                  {
+                    label: 'Coordinates',
+                    value: <LocationValue location={metadata.location} />,
+                  },
+                ]
+              : []
+          }
+        />
+      </div>
     );
   }
 
   return (
-    <dl className="image-details-list">
-      <dt>File</dt>
-      <dd>{metadata.filename}</dd>
-      <dt>Size</dt>
-      <dd>{formatSize(metadata.size)}</dd>
-      <dt>Modified</dt>
-      <dd>{formatDate(metadata.mtime)}</dd>
-      <dt>Duration</dt>
-      <dd>{formatDuration(metadata.duration)}</dd>
-      <dt>Dimensions</dt>
-      <dd>
-        {metadata.dimensions
-          ? `${metadata.dimensions.width} × ${metadata.dimensions.height}`
-          : '—'}
-      </dd>
-      <dt>Format</dt>
-      <dd>{metadata.format ?? '—'}</dd>
-      <dt>Captured</dt>
-      <dd>{formatDate(metadata.captureTime)}</dd>
-      <dt>Video codec</dt>
-      <dd>{metadata.videoCodec ?? '—'}</dd>
-      <dt>Audio codec</dt>
-      <dd>{metadata.audioCodec ?? '—'}</dd>
-      <dt>Frame rate</dt>
-      <dd>{metadata.frameRate ?? '—'}</dd>
-      <dt>Bitrate</dt>
-      <dd>{formatBitrate(metadata.bitrate)}</dd>
-      <dt>Audio channels</dt>
-      <dd>{metadata.audioChannels ?? '—'}</dd>
-      <dt>Sample rate</dt>
-      <dd>
-        {metadata.audioSampleRate ? `${metadata.audioSampleRate} Hz` : '—'}
-      </dd>
-      <dt>Location</dt>
-      <dd>
-        {metadata.location ? (
-          <a
-            href={`https://www.openstreetmap.org/?mlat=${metadata.location.latitude}&mlon=${metadata.location.longitude}#map=15/${metadata.location.latitude}/${metadata.location.longitude}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {formatLocation(metadata.location)}
-          </a>
-        ) : (
-          '—'
-        )}
-      </dd>
-    </dl>
+    <div className="image-details-sections">
+      <DetailSection
+        title="File"
+        items={[
+          { label: 'Name', value: metadata.filename },
+          { label: 'Size', value: formatSize(metadata.size) },
+          { label: 'Modified', value: formatDate(metadata.mtime) },
+          {
+            label: 'Dimensions',
+            value: metadata.dimensions
+              ? `${metadata.dimensions.width} × ${metadata.dimensions.height}`
+              : '—',
+          },
+          { label: 'Format', value: metadata.format ?? '—', hideIfEmpty: true },
+        ]}
+      />
+      <DetailSection
+        title="Playback"
+        items={[
+          { label: 'Duration', value: formatDuration(metadata.duration) },
+          {
+            label: 'Taken',
+            value: formatDate(metadata.captureTime),
+            hideIfEmpty: true,
+          },
+          {
+            label: 'Video codec',
+            value: metadata.videoCodec ?? '—',
+            hideIfEmpty: true,
+          },
+          {
+            label: 'Audio codec',
+            value: metadata.audioCodec ?? '—',
+            hideIfEmpty: true,
+          },
+          {
+            label: 'Frame rate',
+            value: metadata.frameRate ?? '—',
+            hideIfEmpty: true,
+          },
+          {
+            label: 'Bitrate',
+            value: formatBitrate(metadata.bitrate),
+            hideIfEmpty: true,
+          },
+          {
+            label: 'Audio channels',
+            value: metadata.audioChannels ?? '—',
+            hideIfEmpty: true,
+          },
+          {
+            label: 'Sample rate',
+            value: metadata.audioSampleRate
+              ? `${metadata.audioSampleRate} Hz`
+              : '—',
+            hideIfEmpty: true,
+          },
+        ]}
+      />
+      <DetailSection
+        title="Location"
+        items={
+          metadata.location
+            ? [
+                {
+                  label: 'Coordinates',
+                  value: <LocationValue location={metadata.location} />,
+                },
+              ]
+            : []
+        }
+      />
+    </div>
   );
 }
 
@@ -208,6 +301,7 @@ export function MediaDetailsPanel({
   }, [token]);
 
   const isSheet = variant === 'sheet';
+  const kindLabel = metadata?.kind === 'video' ? 'Video details' : 'Image details';
 
   return (
     <div
@@ -219,16 +313,33 @@ export function MediaDetailsPanel({
       {isSheet ? <div className="image-details-sheet-handle" aria-hidden /> : null}
 
       <div className="image-details-header">
-        <h2>Details</h2>
+        <div className="image-details-heading">
+          <p className="image-details-eyebrow">{kindLabel}</p>
+          <h2>{metadata?.filename ?? 'Details'}</h2>
+        </div>
         {onClose ? (
-          <Button variant="secondary" size="sm" onClick={onClose}>
-            Close
+          <Button
+            variant="ghost"
+            size="sm"
+            className="image-details-close"
+            aria-label="Close details"
+            onClick={onClose}
+          >
+            <CloseIcon size={16} />
           </Button>
         ) : null}
       </div>
 
-      {loading ? <p className="status">Loading metadata...</p> : null}
-      {error ? <p className="error">{error}</p> : null}
+      {loading ? (
+        <p className="image-details-status" role="status" aria-live="polite">
+          Loading metadata…
+        </p>
+      ) : null}
+      {error ? (
+        <p className="image-details-error" role="alert">
+          {error}
+        </p>
+      ) : null}
       {metadata ? <MetadataFields metadata={metadata} /> : null}
     </div>
   );

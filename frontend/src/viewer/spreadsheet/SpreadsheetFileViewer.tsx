@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { fetchRawBlob, fetchRawText } from '../../api/client';
-import { IconButton } from '../../ui';
+import { CloseIcon, IconButton } from '../../ui';
 import {
   PreviewSourceToggle,
   type PreviewMode,
@@ -103,7 +103,7 @@ export function SpreadsheetFileViewer({ entry, onClose }: FileViewerProps) {
               />
             ) : null}
             <IconButton label="Close" className="file-viewer-close" onClick={onClose}>
-              ✕
+              <CloseIcon size={16} />
             </IconButton>
           </div>
         </header>

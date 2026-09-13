@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchRawText } from '../../api/client';
-import { IconButton } from '../../ui';
+import { CloseIcon, IconButton } from '../../ui';
 import {
   PreviewSourceToggle,
   type PreviewMode,
@@ -68,7 +68,7 @@ export function CodeFileViewer({ entry, onClose }: FileViewerProps) {
               sourceLabel="Raw"
             />
             <IconButton label="Close" className="file-viewer-close" onClick={onClose}>
-              ✕
+              <CloseIcon size={16} />
             </IconButton>
           </div>
         </header>

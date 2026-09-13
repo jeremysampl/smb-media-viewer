@@ -11,6 +11,7 @@ import 'yet-another-react-lightbox/styles.css';
 import { mediaUrl } from '../api/client';
 import type { BrowseEntry, QualityTier } from '../types';
 import { useQualityPreference } from '../browser/ResolutionSelector';
+import { SelectField } from '../ui';
 import { ChromeRasterImage } from './ChromeRasterImage';
 import { shouldUseChromeImageRaster } from './chromeImageRaster';
 import { MediaDetailsPanel } from './MediaDetailsPanel';
@@ -41,28 +42,28 @@ function GalleryQualitySelect({
   onChange: (quality: QualityTier) => void;
 }) {
   return (
-    <label
+    <div
       className="gallery-toolbar-quality"
       onClick={stopControlEvent}
       onMouseDown={stopControlEvent}
       onTouchStart={stopControlEvent}
     >
-      <span className="sr-only">Quality</span>
-      <select
+      <SelectField
+        label="Quality"
         value={quality}
-        aria-label="Quality"
-        onChange={(event) => onChange(event.target.value as QualityTier)}
+        layout="ghost"
         onClick={stopControlEvent}
         onMouseDown={stopControlEvent}
         onTouchStart={stopControlEvent}
+        onChange={(value) => onChange(value as QualityTier)}
       >
         {profiles.map((profile) => (
           <option key={profile.id} value={profile.id}>
             {profile.label}
           </option>
         ))}
-      </select>
-    </label>
+      </SelectField>
+    </div>
   );
 }
 

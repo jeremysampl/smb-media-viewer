@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchRawText } from '../../api/client';
-import { IconButton } from '../../ui';
+import { CloseIcon, IconButton } from '../../ui';
 import {
   PreviewSourceToggle,
   type PreviewMode,
@@ -63,7 +63,7 @@ export function MarkdownFileViewer({ entry, onClose }: FileViewerProps) {
           <div className="file-viewer-actions">
             <PreviewSourceToggle mode={mode} onChange={setMode} />
             <IconButton label="Close" className="file-viewer-close" onClick={onClose}>
-              ✕
+              <CloseIcon size={16} />
             </IconButton>
           </div>
         </header>
