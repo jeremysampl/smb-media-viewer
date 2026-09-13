@@ -3,11 +3,18 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { config } from '../config.js';
+import {
+  getDisplayFileKind,
+  isDisplayFileKind,
+  type DisplayFileKind,
+} from '../media/fileTypes.js';
+
+export type CacheEntryKind = DisplayFileKind;
 
 export interface CacheMetaRow {
   cachePath: string;
   sourcePath: string | null;
-  kind: 'image' | 'video' | 'unknown';
+  kind: CacheEntryKind;
   quality: string | null;
   size: number;
   createdAt: number;
@@ -45,17 +52,18 @@ function getMetaDb(): DatabaseSync {
   return db;
 }
 
-function inferKindFromPath(cachePath: string): 'image' | 'video' | 'unknown' {
+function inferKindFromPath(cachePath: string): CacheEntryKind {
   const normalized = cachePath.replace(/\\/g, '/').toLowerCase();
   if (normalized.includes('/images/')) return 'image';
   if (normalized.includes('/videos/')) return 'video';
-  return 'unknown';
+  if (normalized.includes('/office-pdf/')) return 'office';
+  return getDisplayFileKind(cachePath);
 }
 
 export function registerCacheEntry(input: {
   cachePath: string;
   sourcePath: string;
-  kind: 'image' | 'video' | 'unknown';
+  kind: CacheEntryKind;
   quality: string;
   size: number;
 }): void {
@@ -87,7 +95,7 @@ export function registerCacheEntry(input: {
     );
 }
 
-/** Bump open count / last access, and touch mtime for LRU cleanup. */
+/** Bump open count / last access and touch mtime for LRU */
 export function recordCacheAccess(cachePath: string): void {
   const resolved = path.resolve(cachePath);
   const now = Date.now();
@@ -185,7 +193,7 @@ function buildCacheWhere(query: CacheListQuery): {
   const clauses: string[] = [];
   const params: Array<string | number> = [];
 
-  if (query.kind === 'image' || query.kind === 'video') {
+  if (query.kind && query.kind !== 'all' && isDisplayFileKind(query.kind)) {
     clauses.push('kind = ?');
     params.push(query.kind);
   }
@@ -257,23 +265,27 @@ export function queryCacheEntries(query: CacheListQuery = {}): {
     page,
     pageSize,
     total,
-    entries: rows.map((row) => ({
-      cachePath: row.cache_path,
-      sourcePath: row.source_path,
-      kind:
-        row.kind === 'image' || row.kind === 'video'
-          ? row.kind
-          : ('unknown' as const),
-      quality: row.quality,
-      size: row.size,
-      createdAt: row.created_at,
-      lastAccessAt: row.last_access_at,
-      accessCount: row.access_count,
-    })),
+    entries: rows.map((row) => {
+      const sourcePath = row.source_path;
+      const kind: CacheEntryKind = isDisplayFileKind(row.kind)
+        ? row.kind
+        : getDisplayFileKind(sourcePath ?? row.cache_path);
+
+      return {
+        cachePath: row.cache_path,
+        sourcePath,
+        kind,
+        quality: row.quality,
+        size: row.size,
+        createdAt: row.created_at,
+        lastAccessAt: row.last_access_at,
+        accessCount: row.access_count,
+      };
+    }),
   };
 }
 
-/** Parent folders of cached sources, for the folder filter dropdown. */
+/** Parent folders of cached sources for the folder filter */
 export function listCacheSourceFolders(limit = 200): string[] {
   const database = getMetaDb();
   const rows = database
@@ -321,8 +333,8 @@ export async function clearCacheEntries(input: {
     for (const row of rows) {
       if (await unlinkQuiet(row.cache_path)) deleted += 1;
     }
-    // Remove image/video dirs too (covers orphans missing from meta).
-    for (const sub of ['images', 'videos']) {
+    // Also wipe known cache subdirs (orphans not in meta)
+    for (const sub of ['images', 'videos', 'office-pdf']) {
       const root = path.join(config.cacheDir, sub);
       try {
         await fsp.rm(root, { recursive: true, force: true });

@@ -10,16 +10,9 @@ export type MediaType = 'image' | 'video';
 
 export type EntryType = 'folder' | MediaType | 'file';
 
-/** Non-media overlay viewers. Keep in sync with frontend ViewerKind. */
-export type ViewerKind =
-  | 'text'
-  | 'pdf'
-  | 'spreadsheet'
-  | 'office'
-  | 'markdown'
-  | 'latex'
-  | 'code'
-  | 'audio';
+/** Non-media overlay viewers */
+export type { ViewerKind } from './media/fileTypes.js';
+import type { ViewerKind } from './media/fileTypes.js';
 
 export interface ShareInfo {
   name: string;
@@ -38,9 +31,9 @@ export interface BrowseEntry {
   size?: number;
   mtime?: string;
   captureTime?: string;
-  /** False until the index has a fresh row for this file (thumb may still be generating). */
+  /** False until the index has a fresh row for this file */
   indexed?: boolean;
-  /** Which overlay viewer opens this non-media file. */
+  /** Overlay viewer for this non-media file */
   viewer?: ViewerKind;
   format?: string;
   duration?: number;

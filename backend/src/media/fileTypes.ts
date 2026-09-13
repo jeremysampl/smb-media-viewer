@@ -12,7 +12,7 @@ const IMAGE_EXTENSIONS = new Set([
   '.avif',
 ]);
 
-/** Formats browsers can show as-is in <img> across Chromium/Firefox/Safari. */
+/** Browser-native <img> formats */
 const BROWSER_NATIVE_IMAGE_TYPES: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -38,8 +38,8 @@ const VIDEO_EXTENSIONS = new Set([
 ]);
 
 /**
- * Viewer kinds for non-media files. Add a kind here, map extensions below,
- * then register a frontend viewer for that kind.
+ * Viewer kinds for non-media files
+ * Add a kind here, map extensions below, then register a frontend viewer
  */
 export type ViewerKind =
   | 'text'
@@ -244,7 +244,7 @@ const AUDIO_CONTENT_TYPES: Record<string, string> = {
   '.weba': 'audio/webm',
 };
 
-/** extension → viewer kind. Grow this map as new viewers ship. */
+/** extension → viewer kind */
 const VIEWER_BY_EXTENSION: Record<string, ViewerKind> = {
   ...Object.fromEntries(
     Object.keys(TEXT_CONTENT_TYPES).map((ext) => [ext, 'text' as const]),
@@ -306,6 +306,42 @@ export function isVideoFile(filename: string): boolean {
 
 export function isMediaFile(filename: string): boolean {
   return isImageFile(filename) || isVideoFile(filename);
+}
+
+/**
+ * Admin/table display kind from the source filename
+ * (office→PDF cache still labels as the original type)
+ */
+export type DisplayFileKind = 'image' | 'video' | ViewerKind | 'file';
+
+const VIEWER_KINDS = new Set<string>([
+  'text',
+  'pdf',
+  'spreadsheet',
+  'office',
+  'markdown',
+  'latex',
+  'code',
+  'audio',
+]);
+
+export function isViewerKind(value: string): value is ViewerKind {
+  return VIEWER_KINDS.has(value);
+}
+
+export function isDisplayFileKind(value: string): value is DisplayFileKind {
+  return value === 'image' || value === 'video' || value === 'file' || isViewerKind(value);
+}
+
+export function getDisplayFileKind(filename: string): DisplayFileKind {
+  if (isImageFile(filename)) return 'image';
+  if (isVideoFile(filename)) return 'video';
+  return getViewerKind(filename) ?? 'file';
+}
+
+/** Whether UI should try a raster thumbnail first */
+export function prefersRasterPreview(filename: string): boolean {
+  return isMediaFile(filename);
 }
 
 export function getViewerKind(filename: string): ViewerKind | null {
@@ -391,7 +427,7 @@ export function getViewerContentType(filename: string): string {
   return 'application/octet-stream';
 }
 
-/** Content-Type if the file can be streamed to browsers without conversion; else null. */
+/** Content-Type for streaming without conversion, else null */
 export function getBrowserNativeImageContentType(filename: string): string | null {
   return BROWSER_NATIVE_IMAGE_TYPES[getExtension(filename)] ?? null;
 }

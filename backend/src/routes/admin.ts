@@ -16,6 +16,10 @@ import { getIndexQueueStatus } from '../index/indexer.js';
 import { listRecentJobs, listTrackedJobs } from '../jobs/tracker.js';
 import { getSystemMetrics } from '../util/systemMetrics.js';
 import {
+  getDisplayFileKind,
+  getFormatLabel,
+} from '../media/fileTypes.js';
+import {
   adminMiddleware,
   authMiddleware,
   type AuthenticatedRequest,
@@ -68,20 +72,24 @@ router.get('/cache/entries', (req: AuthenticatedRequest, res) => {
     pageSize: result.pageSize,
     total: result.total,
     folders: listCacheSourceFolders(),
-    entries: result.entries.map((entry) => ({
-      id: entry.cachePath,
-      cachePath: entry.cachePath,
-      sourcePath: entry.sourcePath,
-      label: entry.sourcePath
-        ? entry.sourcePath.replace(/^.*[/\\]/, '')
-        : entry.cachePath.replace(/^.*[/\\]/, ''),
-      kind: entry.kind,
-      quality: entry.quality,
-      size: entry.size,
-      createdAt: entry.createdAt,
-      lastAccessAt: entry.lastAccessAt,
-      accessCount: entry.accessCount,
-    })),
+    entries: result.entries.map((entry) => {
+      const pathForKind = entry.sourcePath ?? entry.cachePath;
+      return {
+        id: entry.cachePath,
+        cachePath: entry.cachePath,
+        sourcePath: entry.sourcePath,
+        label: entry.sourcePath
+          ? entry.sourcePath.replace(/^.*[/\\]/, '')
+          : entry.cachePath.replace(/^.*[/\\]/, ''),
+        kind: getDisplayFileKind(pathForKind),
+        format: getFormatLabel(pathForKind),
+        quality: entry.quality,
+        size: entry.size,
+        createdAt: entry.createdAt,
+        lastAccessAt: entry.lastAccessAt,
+        accessCount: entry.accessCount,
+      };
+    }),
   });
 });
 
@@ -125,6 +133,7 @@ router.get('/index/entries', (req: AuthenticatedRequest, res) => {
       path: entry.absolutePath,
       label: entry.absolutePath.replace(/^.*[/\\]/, ''),
       kind: entry.kind,
+      format: getFormatLabel(entry.absolutePath),
       size: entry.size,
       mtimeMs: entry.mtimeMs,
       captureTime: entry.captureTime,

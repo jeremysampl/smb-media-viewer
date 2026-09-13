@@ -132,7 +132,8 @@ export interface AdminCacheEntry {
   cachePath: string;
   sourcePath: string | null;
   label: string;
-  kind: 'image' | 'video' | 'unknown';
+  kind: string;
+  format?: string;
   quality: string | null;
   size: number;
   createdAt: number;
@@ -190,6 +191,7 @@ export interface AdminIndexEntry {
   path: string;
   label: string;
   kind: 'image' | 'video';
+  format?: string;
   size: number;
   mtimeMs: number;
   captureTime: string | null;

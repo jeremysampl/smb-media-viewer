@@ -15,7 +15,7 @@ function isUnderRoot(absolutePath: string, root: string): boolean {
   );
 }
 
-/** Reject paths outside mediaRoot / devMediaRoot. */
+/** Reject paths outside mediaRoot / devMediaRoot */
 export function isAllowedAdminMediaPath(absolutePath: string): boolean {
   return (
     isUnderRoot(absolutePath, config.mediaRoot) ||
@@ -45,7 +45,7 @@ async function streamFile(
   });
 }
 
-/** Use the index thumb if we have one, otherwise a quick Sharp resize for images. */
+/** Index thumb if present, else Sharp resize for images */
 export async function sendAdminPreview(
   res: Response,
   absolutePath: string,

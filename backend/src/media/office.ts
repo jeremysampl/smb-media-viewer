@@ -11,6 +11,7 @@ import {
 } from '../cache/cache.js';
 import { recordCacheAccess, registerCacheEntry } from '../cache/meta.js';
 import { setTrackedJobOutputSize, withTrackedJob } from '../jobs/tracker.js';
+import { getDisplayFileKind } from './fileTypes.js';
 
 function runCommand(command: string, args: string[], timeoutMs = 120_000): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -89,7 +90,7 @@ export async function getOfficePdf(
     registerCacheEntry({
       cachePath,
       sourcePath,
-      kind: 'unknown',
+      kind: getDisplayFileKind(sourcePath),
       quality: 'office-pdf',
       size,
     });
@@ -106,7 +107,7 @@ export async function getOfficePdf(
       registerCacheEntry({
         cachePath,
         sourcePath,
-        kind: 'unknown',
+        kind: getDisplayFileKind(sourcePath),
         quality: 'office-pdf',
         size: outStats.size,
       });
