@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import type { QualityProfile, QualityTier } from '../types';
-import { Button } from '../ui';
+import { Button, SelectField } from '../ui';
 
 interface DownloadDialogProps {
   open: boolean;
@@ -62,21 +62,20 @@ export function DownloadDialog({
           />
         </label>
 
-        <label>
-          Media quality
-          <select
-            value={downloadQuality}
-            onChange={(event) => setDownloadQuality(event.target.value as QualityTier)}
-            disabled={busy}
-          >
-            {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.label}
-                {profile.id === 'full' ? ' (originals)' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          label="Media quality"
+          value={downloadQuality}
+          layout="stack"
+          disabled={busy}
+          onChange={(value) => setDownloadQuality(value as QualityTier)}
+        >
+          {profiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {profile.label}
+              {profile.id === 'full' ? ' (originals)' : ''}
+            </option>
+          ))}
+        </SelectField>
 
         {error ? <p className="error">{error}</p> : null}
 

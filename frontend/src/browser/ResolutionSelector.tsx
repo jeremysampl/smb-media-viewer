@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { getQualityProfiles } from '../api/client';
 import type { QualityProfile, QualityTier } from '../types';
+import { SelectField, type SelectFieldLayout } from '../ui';
 
 const STORAGE_KEY = 'smb-media-quality';
 
@@ -63,29 +64,27 @@ interface ResolutionSelectorProps {
   profiles: QualityProfile[];
   onChange: (quality: QualityTier) => void;
   compact?: boolean;
+  layout?: SelectFieldLayout;
 }
 
 export function ResolutionSelector({
   quality,
   profiles,
   onChange,
-  compact = false,
+  layout = 'inline',
 }: ResolutionSelectorProps) {
   return (
-    <label className={`toolbar-control${compact ? ' compact' : ''}`}>
-      <span className="toolbar-control-label">Quality</span>
-      <select
-        className="toolbar-control-select"
-        value={quality}
-        onChange={(event) => onChange(event.target.value as QualityTier)}
-        aria-label="Quality"
-      >
-        {profiles.map((profile) => (
-          <option key={profile.id} value={profile.id}>
-            {profile.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <SelectField
+      label="Quality"
+      value={quality}
+      layout={layout}
+      onChange={(value) => onChange(value as QualityTier)}
+    >
+      {profiles.map((profile) => (
+        <option key={profile.id} value={profile.id}>
+          {profile.label}
+        </option>
+      ))}
+    </SelectField>
   );
 }

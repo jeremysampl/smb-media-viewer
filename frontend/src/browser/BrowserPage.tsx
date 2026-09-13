@@ -8,23 +8,25 @@ import { browsePathToUrl, urlSplatToBrowsePath } from './browsePath';
 import { MediaGallery } from '../gallery/MediaGallery';
 import { FileViewerHost } from '../viewer/FileViewerHost';
 import { isViewableFileEntry } from '../viewer/kinds';
-import { LazyThumbnail } from './LazyThumbnail';
-import { FileTypeIcon } from './FileTypeIcon';
+import { FileThumb } from '../files/FileThumb';
 import { VirtualFileGrid } from './VirtualFileGrid';
 import { ResolutionSelector, useQualityPreference } from './ResolutionSelector';
 import { SortSelector, useSortPreference } from './SortSelector';
 import { FileTypeSelector } from './FileTypeSelector';
 import {
+  FILE_TYPE_FILTER_GROUPS,
+  FILE_TYPE_FILTER_TOP,
   filterEntriesByFileType,
   useFileTypeFilterPreference,
+  type FileTypeFilter,
 } from './fileTypeFilter';
 import { GridDetailsToggle, useGridDetailsPreference } from './GridDetailsToggle';
 import { DownloadDialog } from './DownloadDialog';
 import { EntryContextMenu, type ContextMenuState } from './EntryContextMenu';
 import { UserMenu } from './UserMenu';
 import { formatDuration, formatEntryMeta } from './formatters';
-import { sortEntries } from './sortEntries';
-import { Button } from '../ui';
+import { SORT_OPTIONS, sortEntries } from './sortEntries';
+import { Button, ChevronDownIcon, CloseIcon } from '../ui';
 import {
   gapForColumns,
   paddingForColumns,
@@ -43,6 +45,16 @@ const LONG_PRESS_MOVE_PX = 12;
 function defaultZipNameForPath(browsePath: string): string {
   const segments = browsePath.split('/').filter(Boolean);
   return segments.at(-1) || 'Shares';
+}
+
+function fileTypeFilterLabel(filter: FileTypeFilter): string {
+  const top = FILE_TYPE_FILTER_TOP.find((option) => option.id === filter);
+  if (top) return top.label;
+  for (const group of FILE_TYPE_FILTER_GROUPS) {
+    const match = group.options.find((option) => option.id === filter);
+    if (match) return match.label;
+  }
+  return filter;
 }
 
 export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPageProps) {
@@ -72,6 +84,7 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [typeFilterBusy, setTypeFilterBusy] = useState(false);
   const [sortBusy, setSortBusy] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
 
   const longPressTimerRef = useRef<number | null>(null);
   const longPressOriginRef = useRef<{ x: number; y: number } | null>(null);
@@ -154,6 +167,24 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selectMode]);
+
+  useEffect(() => {
+    if (!isMobile) setControlsOpen(false);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!controlsOpen) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setControlsOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [controlsOpen]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -454,31 +485,132 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
     >
       <header className="top-bar">
         <div className="top-bar-brand">
-          <h1>Media Library</h1>
+          <img
+            className="top-bar-mark"
+            src="/favicon.svg"
+            alt=""
+            width={36}
+            height={36}
+            aria-hidden
+          />
+          <div className="top-bar-copy">
+            <p className="top-bar-eyebrow">SMB Media Viewer</p>
+            <h1>Media Library</h1>
+          </div>
         </div>
         <UserMenu username={username} onLogout={onLogout} isAdmin={isAdmin} />
       </header>
 
-      <div className="browser-nav-row">
+      <div className="browser-nav">
         <Breadcrumbs path={currentPath} onNavigate={navigateToPath} />
-        <div className="toolbar-group" role="group" aria-label="Library controls">
-          <SortSelector sort={sort} onChange={handleSortChange} busy={sortBusy} />
-          <FileTypeSelector
-            value={fileTypeFilter}
-            onChange={handleFileTypeFilterChange}
-            busy={typeFilterBusy}
-          />
-          <ResolutionSelector
-            quality={quality}
-            profiles={profiles}
-            onChange={setQuality}
-          />
-          <GridDetailsToggle
-            enabled={showGridDetails}
-            onChange={setShowGridDetails}
-          />
-        </div>
+
+        {isMobile ? (
+          <button
+            type="button"
+            className="browser-options-btn"
+            aria-haspopup="dialog"
+            aria-expanded={controlsOpen}
+            onClick={() => setControlsOpen(true)}
+          >
+            <span className="browser-options-btn-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width="18" height="18">
+                <path
+                  fill="currentColor"
+                  d="M4 6.75h16v1.5H4v-1.5Zm2.5 4.5h11v1.5h-11v-1.5Zm2.5 4.5h6v1.5h-6v-1.5Z"
+                />
+              </svg>
+            </span>
+            <span className="browser-options-btn-copy">
+              <span className="browser-options-btn-title">Library options</span>
+              <span className="browser-options-btn-meta">
+                {SORT_OPTIONS.find((option) => option.id === sort)?.label ?? sort}
+                {' · '}
+                {fileTypeFilterLabel(fileTypeFilter)}
+                {' · '}
+                {profiles.find((profile) => profile.id === quality)?.label ?? quality}
+              </span>
+            </span>
+            <span className="browser-options-btn-chevron" aria-hidden>
+              <ChevronDownIcon size={16} />
+            </span>
+          </button>
+        ) : (
+          <div className="toolbar-group" role="group" aria-label="Library controls">
+            <SortSelector sort={sort} onChange={handleSortChange} busy={sortBusy} />
+            <FileTypeSelector
+              value={fileTypeFilter}
+              onChange={handleFileTypeFilterChange}
+              busy={typeFilterBusy}
+            />
+            <ResolutionSelector
+              quality={quality}
+              profiles={profiles}
+              onChange={setQuality}
+            />
+            <GridDetailsToggle
+              enabled={showGridDetails}
+              onChange={setShowGridDetails}
+            />
+          </div>
+        )}
       </div>
+
+      {isMobile && controlsOpen ? (
+        <div
+          className="modal-backdrop browser-controls-backdrop"
+          role="presentation"
+          onClick={() => setControlsOpen(false)}
+        >
+          <div
+            className="modal-card browser-controls-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="browser-controls-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="browser-controls-sheet-handle" aria-hidden />
+            <div className="browser-controls-sheet-header">
+              <h2 id="browser-controls-title">Library options</h2>
+              <button
+                type="button"
+                className="browser-controls-close"
+                aria-label="Close options"
+                onClick={() => setControlsOpen(false)}
+              >
+                <CloseIcon size={16} />
+              </button>
+            </div>
+            <div className="toolbar-group toolbar-group-sheet" role="group" aria-label="Library controls">
+              <SortSelector
+                sort={sort}
+                onChange={handleSortChange}
+                busy={sortBusy}
+                layout="stack"
+              />
+              <FileTypeSelector
+                value={fileTypeFilter}
+                onChange={handleFileTypeFilterChange}
+                busy={typeFilterBusy}
+                layout="stack"
+              />
+              <ResolutionSelector
+                quality={quality}
+                profiles={profiles}
+                onChange={setQuality}
+                layout="stack"
+              />
+              <GridDetailsToggle
+                enabled={showGridDetails}
+                onChange={setShowGridDetails}
+                layout="stack"
+              />
+            </div>
+            <Button className="browser-controls-done" onClick={() => setControlsOpen(false)}>
+              Done
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {loading ? <p className="status">Loading...</p> : null}
       {error ? <p className="error">{error}</p> : null}
@@ -555,25 +687,25 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
                       📁
                     </div>
                   ) : entry.type === 'file' ? (
-                    <FileTypeIcon format={entry.format} />
-                  ) : entry.token && entry.type === 'image' ? (
-                    <LazyThumbnail
+                    <FileThumb
+                      filename={entry.name}
+                      format={entry.format}
+                    />
+                  ) : entry.token &&
+                    (entry.type === 'image' || entry.type === 'video') ? (
+                    <FileThumb
                       key={`${entry.path}:${sort}:${fileTypeFilter}`}
+                      filename={entry.name}
+                      format={entry.format}
+                      alt={entry.name}
+                      lazy
+                      layoutKey={gridLayoutKey}
                       src={
                         entry.thumbnailUrl ??
-                        mediaUrl(entry.token, 'image', 'very_low')
+                        (entry.type === 'image'
+                          ? mediaUrl(entry.token, 'image', 'very_low')
+                          : mediaUrl(entry.token, 'poster'))
                       }
-                      alt={entry.name}
-                      layoutKey={gridLayoutKey}
-                    />
-                  ) : entry.token && entry.type === 'video' ? (
-                    <LazyThumbnail
-                      key={`${entry.path}:${sort}:${fileTypeFilter}`}
-                      src={
-                        entry.thumbnailUrl ?? mediaUrl(entry.token, 'poster')
-                      }
-                      alt={entry.name}
-                      layoutKey={gridLayoutKey}
                     />
                   ) : (
                     <div className="placeholder" />

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronDownIcon } from '../ui';
 
 interface UserMenuProps {
   username: string;
@@ -53,7 +54,7 @@ export function UserMenu({ username, onLogout, isAdmin = false }: UserMenuProps)
         </span>
         <span className="user-menu-name">{username}</span>
         <span className="user-menu-caret" aria-hidden>
-          ▾
+          <ChevronDownIcon size={14} />
         </span>
       </button>
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getIsMobileUi } from '../hooks/useIsMobile';
+import type { SelectFieldLayout } from '../ui';
 
 const STORAGE_KEY = 'smb-grid-show-details';
 
@@ -29,12 +30,17 @@ export function useGridDetailsPreference(): {
 interface GridDetailsToggleProps {
   enabled: boolean;
   onChange: (enabled: boolean) => void;
+  layout?: Exclude<SelectFieldLayout, 'ghost'>;
 }
 
-export function GridDetailsToggle({ enabled, onChange }: GridDetailsToggleProps) {
+export function GridDetailsToggle({
+  enabled,
+  onChange,
+  layout = 'inline',
+}: GridDetailsToggleProps) {
   return (
-    <label className="toolbar-control toolbar-toggle">
-      <span className="toolbar-control-label">Details</span>
+    <label className={`select-field select-field--${layout} details-toggle`}>
+      <span className="select-field__label">Details</span>
       <span className="slider-toggle">
         <input
           type="checkbox"
