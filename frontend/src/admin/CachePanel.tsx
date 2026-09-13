@@ -133,6 +133,7 @@ export function CachePanel({ active, now }: CachePanelProps) {
               label={row.label}
               path={row.sourcePath}
               size={row.size}
+              format={row.format}
               formatBytes={formatBytes}
             />
           ) : (

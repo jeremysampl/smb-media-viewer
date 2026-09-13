@@ -1,4 +1,4 @@
-import { Button } from '../../ui';
+import { Button, SelectField } from '../../ui';
 
 interface AdminPaginationProps {
   page: number;
@@ -31,42 +31,43 @@ export function AdminPagination({
       </p>
       <div className="admin-pagination-controls">
         {onPageSizeChange ? (
-          <label className="admin-table-control admin-table-control-narrow">
-            <span className="admin-table-control-label">Per page</span>
-            <select
-              value={pageSize}
-              aria-label="Rows per page"
-              onChange={(event) => onPageSizeChange(Number(event.target.value))}
-            >
-              {pageSizeOptions.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectField
+            className="admin-page-size"
+            label="Per page"
+            value={String(pageSize)}
+            layout="inline"
+            onChange={(value) => onPageSizeChange(Number(value))}
+          >
+            {pageSizeOptions.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </SelectField>
         ) : null}
-        <Button
-          variant="secondary"
-          size="sm"
-          className="admin-page-btn"
-          disabled={safePage <= 1}
-          onClick={() => onPageChange(safePage - 1)}
-        >
-          Previous
-        </Button>
-        <span className="admin-page-indicator">
-          Page {safePage} / {pageCount}
-        </span>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="admin-page-btn"
-          disabled={safePage >= pageCount}
-          onClick={() => onPageChange(safePage + 1)}
-        >
-          Next
-        </Button>
+        <div className="admin-page-nav">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="admin-page-btn"
+            disabled={safePage <= 1}
+            onClick={() => onPageChange(safePage - 1)}
+          >
+            Previous
+          </Button>
+          <span className="admin-page-indicator">
+            Page {safePage} / {pageCount}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="admin-page-btn"
+            disabled={safePage >= pageCount}
+            onClick={() => onPageChange(safePage + 1)}
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   );

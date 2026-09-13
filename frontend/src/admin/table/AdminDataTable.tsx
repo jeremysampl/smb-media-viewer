@@ -73,7 +73,7 @@ export function AdminDataTable<T, K extends string>({
               <Fragment key={id}>
                 <tr className={rowClassName?.(row)}>
                   {selectable ? (
-                    <td className="admin-select-col">
+                    <td className="admin-select-col" data-label="Select">
                       <input
                         type="checkbox"
                         checked={selected}
@@ -85,6 +85,7 @@ export function AdminDataTable<T, K extends string>({
                   {columns.map((column) => (
                     <td
                       key={column.id}
+                      data-label={column.label}
                       className={[
                         column.align === 'right' ? 'is-right' : undefined,
                         column.hideBelow === 'tablet'

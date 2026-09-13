@@ -132,6 +132,7 @@ export function IndexPanel({ active, now, indexedTotal }: IndexPanelProps) {
             label={row.label}
             path={row.path}
             size={row.size}
+            format={row.format}
             formatBytes={formatBytes}
           />
         ),

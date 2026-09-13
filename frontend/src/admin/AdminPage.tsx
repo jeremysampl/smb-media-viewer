@@ -77,10 +77,12 @@ export function AdminPage() {
     <div className="admin-page">
       <header className="top-bar">
         <div className="top-bar-brand">
-          <p className="admin-eyebrow">
-            <Link to="/">← Library</Link>
-          </p>
-          <h1>Admin</h1>
+          <div className="top-bar-copy">
+            <p className="admin-eyebrow">
+              <Link to="/">← Back to library</Link>
+            </p>
+            <h1>Admin Dashboard</h1>
+          </div>
         </div>
         <UserMenu username={username} onLogout={logout} isAdmin />
       </header>

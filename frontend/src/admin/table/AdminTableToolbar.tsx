@@ -1,4 +1,5 @@
 import type { FileTypeFilter } from '../../browser/fileTypeFilter';
+import { SelectField } from '../../ui';
 import {
   ADMIN_MEDIA_FILE_TYPE_GROUPS,
   ADMIN_MEDIA_FILE_TYPE_TOP,
@@ -98,57 +99,54 @@ export function AdminTableToolbar<K extends string>({
         ) : null}
 
         {showFileType && onFileTypeChange ? (
-          <label className="admin-table-control">
-            <span className="admin-table-control-label">Type</span>
-            <select
-              value={fileType}
-              aria-label="File type"
-              onChange={(event) => onFileTypeChange(event.target.value)}
-            >
-              {ADMIN_MEDIA_FILE_TYPE_TOP.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-              {ADMIN_MEDIA_FILE_TYPE_GROUPS.map((group) => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.options.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </label>
-        ) : null}
-
-        <label className="admin-table-control">
-          <span className="admin-table-control-label">Sort</span>
-          <select
-            value={sort.key}
-            aria-label="Sort by"
-            onChange={(event) => onSortKeyChange(event.target.value as K)}
+          <SelectField
+            className="admin-table-control"
+            label="Type"
+            value={fileType}
+            layout="stack"
+            onChange={onFileTypeChange}
           >
-            {sortOptions.map((option) => (
-              <option key={option.key} value={option.key}>
+            {ADMIN_MEDIA_FILE_TYPE_TOP.map((option) => (
+              <option key={option.id} value={option.id}>
                 {option.label}
               </option>
             ))}
-          </select>
-        </label>
+            {ADMIN_MEDIA_FILE_TYPE_GROUPS.map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.options.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </SelectField>
+        ) : null}
 
-        <label className="admin-table-control admin-table-control-narrow">
-          <span className="admin-table-control-label">Order</span>
-          <select
-            value={sort.dir}
-            aria-label="Sort order"
-            onChange={(event) => onSortDirChange(event.target.value as SortDir)}
-          >
-            <option value="desc">Newest / high first</option>
-            <option value="asc">Oldest / low first</option>
-          </select>
-        </label>
+        <SelectField
+          className="admin-table-control"
+          label="Sort"
+          value={sort.key}
+          layout="stack"
+          onChange={(value) => onSortKeyChange(value as K)}
+        >
+          {sortOptions.map((option) => (
+            <option key={option.key} value={option.key}>
+              {option.label}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField
+          className="admin-table-control admin-table-control-narrow"
+          label="Order"
+          value={sort.dir}
+          layout="stack"
+          onChange={(value) => onSortDirChange(value as SortDir)}
+        >
+          <option value="desc">Newest / high first</option>
+          <option value="asc">Oldest / low first</option>
+        </SelectField>
       </div>
     </div>
   );

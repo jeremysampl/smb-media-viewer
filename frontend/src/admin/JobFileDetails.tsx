@@ -8,7 +8,10 @@ import {
   type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { getFormatLabel } from '@smb/file-types';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { FileThumb } from '../files/FileThumb';
+import { Button, CloseIcon } from '../ui';
 
 export function adminPreviewUrl(absolutePath: string): string {
   return `/api/admin/preview?path=${encodeURIComponent(absolutePath)}`;
@@ -25,6 +28,7 @@ interface JobFileDetailsProps {
   label: string;
   path: string;
   size?: number;
+  format?: string;
   formatBytes: (bytes: number) => string;
 }
 
@@ -32,11 +36,11 @@ export function JobFileDetails({
   label,
   path,
   size,
+  format,
   formatBytes,
 }: JobFileDetailsProps) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
-  const [previewFailed, setPreviewFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -44,7 +48,9 @@ export function JobFileDetails({
   const hoverTimer = useRef<number | undefined>(undefined);
   const closeTimer = useRef<number | undefined>(undefined);
   const panelId = useId();
+  const titleId = useId();
   const folder = parentPath(path);
+  const resolvedFormat = format ?? getFormatLabel(path);
 
   const clearCloseTimer = useCallback(() => {
     if (closeTimer.current !== undefined) {
@@ -79,7 +85,7 @@ export function JobFileDetails({
     }
     updateAnchor();
     window.addEventListener('resize', updateAnchor);
-    // Capture scroll from nested overflow containers (job list).
+    // Nested overflow (job list) scrolls need capture
     window.addEventListener('scroll', updateAnchor, true);
     return () => {
       window.removeEventListener('resize', updateAnchor);
@@ -110,10 +116,6 @@ export function JobFileDetails({
   }, [open, close]);
 
   useEffect(() => {
-    setPreviewFailed(false);
-  }, [path, open]);
-
-  useEffect(() => {
     return () => {
       if (hoverTimer.current !== undefined) window.clearTimeout(hoverTimer.current);
       if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
@@ -132,16 +134,12 @@ export function JobFileDetails({
 
   const preview = (
     <div className="admin-job-preview-media">
-      {previewFailed ? (
-        <div className="admin-job-preview-fallback">Preview unavailable</div>
-      ) : (
-        <img
-          src={adminPreviewUrl(path)}
-          alt=""
-          loading="lazy"
-          onError={() => setPreviewFailed(true)}
-        />
-      )}
+      <FileThumb
+        filename={path}
+        format={resolvedFormat}
+        alt={label}
+        src={adminPreviewUrl(path)}
+      />
     </div>
   );
 
@@ -238,7 +236,7 @@ export function JobFileDetails({
               className="admin-job-sheet-root"
               role="dialog"
               aria-modal="true"
-              aria-labelledby={panelId}
+              aria-labelledby={titleId}
             >
               <button
                 type="button"
@@ -246,13 +244,25 @@ export function JobFileDetails({
                 aria-label="Close"
                 onClick={close}
               />
-              <div className="admin-job-sheet" id={panelId}>
+              <div className="admin-job-sheet" id={panelId} ref={cardRef}>
                 <div className="admin-job-sheet-handle" aria-hidden />
+                <div className="admin-job-sheet-header">
+                  <div className="admin-job-sheet-heading">
+                    <p className="admin-job-sheet-eyebrow">File preview</p>
+                    <h2 id={titleId}>{label}</h2>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="admin-job-sheet-close"
+                    aria-label="Close preview"
+                    onClick={close}
+                  >
+                    <CloseIcon size={16} />
+                  </Button>
+                </div>
                 {preview}
                 <div className="admin-job-preview-meta">{pathBlock}</div>
-                <button type="button" className="admin-job-sheet-close" onClick={close}>
-                  Close
-                </button>
               </div>
             </div>,
             document.body,
