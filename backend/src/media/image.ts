@@ -13,6 +13,14 @@ import { setTrackedJobOutputSize, withTrackedJob } from '../jobs/tracker.js';
 import { registerCacheEntry, recordCacheAccess } from '../cache/meta.js';
 import { getBrowserNativeImageContentType } from './fileTypes.js';
 
+// Don't keep source files open in libvips (important on SMB / concurrent viewers)
+sharp.cache({ files: 0 });
+
+const resizeInFlight = new Map<
+  string,
+  Promise<{ filePath: string; contentType: string }>
+>();
+
 export async function getResizedImage(
   sourcePath: string,
   quality: QualityTier,
@@ -60,7 +68,10 @@ export async function getResizedImage(
     return { filePath: cached.filePath, contentType: 'image/webp' };
   }
 
-  return withTrackedJob(
+  const existing = resizeInFlight.get(key);
+  if (existing) return existing;
+
+  const work = withTrackedJob(
     { kind: 'image_resize', path: sourcePath, size: stats.size, quality },
     async (jobId) => {
       const profile = getQualityProfile(quality);
@@ -108,7 +119,12 @@ export async function getResizedImage(
 
       return { filePath: cachePath, contentType: 'image/webp' };
     },
-  );
+  ).finally(() => {
+    resizeInFlight.delete(key);
+  });
+
+  resizeInFlight.set(key, work);
+  return work;
 }
 
 export async function getThumbnailImage(

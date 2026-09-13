@@ -24,10 +24,11 @@ import {
   isPdfFile,
   isSpreadsheetFile,
 } from '../media/fileTypes.js';
+import { pipeFileStream } from '../util/pipeFileStream.js';
 
 const router = Router();
 
-/** Soft caps for in-browser previews (bytes). */
+/** Soft caps for in-browser previews (bytes) */
 const TEXT_VIEW_MAX_BYTES = 5 * 1024 * 1024;
 const PDF_VIEW_MAX_BYTES = 80 * 1024 * 1024;
 const SPREADSHEET_VIEW_MAX_BYTES = 25 * 1024 * 1024;
@@ -122,7 +123,7 @@ router.get('/:token/image', async (req: AuthenticatedRequest, res) => {
     const result = await getResizedImage(sourcePath, quality);
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    fs.createReadStream(result.filePath).pipe(res);
+    pipeFileStream(req, res, fs.createReadStream(result.filePath));
   } catch (error) {
     console.error('Image processing failed:', error);
     res.status(500).json({ error: 'Failed to process image' });
@@ -147,7 +148,7 @@ router.get('/:token/video', async (req: AuthenticatedRequest, res) => {
     for (const [key, value] of Object.entries(ranged.headers)) {
       res.setHeader(key, value);
     }
-    ranged.stream.pipe(res);
+    pipeFileStream(req, res, ranged.stream);
   } catch (error) {
     console.error('Video processing failed:', error);
     res.status(500).json({ error: 'Failed to process video' });
@@ -165,7 +166,7 @@ router.get('/:token/poster', async (req: AuthenticatedRequest, res) => {
     const result = await getVideoPoster(sourcePath);
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    fs.createReadStream(result.filePath).pipe(res);
+    pipeFileStream(req, res, fs.createReadStream(result.filePath));
   } catch (error) {
     console.error('Poster generation failed:', error);
     res.status(500).json({ error: 'Failed to generate poster' });
@@ -239,7 +240,7 @@ router.get('/:token/asset', async (req: AuthenticatedRequest, res) => {
       res.setHeader('Content-Type', nativeType);
       res.setHeader('Content-Length', String(stats.size));
       res.setHeader('Cache-Control', 'private, max-age=300');
-      fs.createReadStream(assetPath).pipe(res);
+      pipeFileStream(req, res, fs.createReadStream(assetPath));
       return;
     }
 
@@ -247,7 +248,7 @@ router.get('/:token/asset', async (req: AuthenticatedRequest, res) => {
     const result = await getResizedImage(assetPath, 'high');
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Cache-Control', 'private, max-age=300');
-    fs.createReadStream(result.filePath).pipe(res);
+    pipeFileStream(req, res, fs.createReadStream(result.filePath));
   } catch (error) {
     console.error('Document asset serve failed:', error);
     res.status(500).json({ error: 'Failed to load asset' });
@@ -292,7 +293,7 @@ router.get('/:token/pdf-preview', async (req: AuthenticatedRequest, res) => {
       'Content-Disposition',
       `inline; filename="${basename.replace(/\.[^.]+$/, '.pdf').replace(/"/g, '')}"`,
     );
-    fs.createReadStream(result.filePath).pipe(res);
+    pipeFileStream(req, res, fs.createReadStream(result.filePath));
   } catch (error) {
     console.error('Office PDF preview failed:', error);
     const message = error instanceof Error ? error.message : 'Failed to convert document';
@@ -375,7 +376,7 @@ router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
       }
       res.setHeader('Cache-Control', 'private, max-age=300');
       res.setHeader('Content-Disposition', `inline; filename="${basename.replace(/"/g, '')}"`);
-      ranged.stream.pipe(res);
+      pipeFileStream(req, res, ranged.stream);
       return;
     }
 
@@ -383,7 +384,7 @@ router.get('/:token/raw', async (req: AuthenticatedRequest, res) => {
     res.setHeader('Content-Length', String(stats.size));
     res.setHeader('Cache-Control', 'private, max-age=300');
     res.setHeader('Content-Disposition', `inline; filename="${basename.replace(/"/g, '')}"`);
-    fs.createReadStream(sourcePath).pipe(res);
+    pipeFileStream(req, res, fs.createReadStream(sourcePath));
   } catch (error) {
     console.error('Raw file serve failed:', error);
     res.status(500).json({ error: 'Failed to read file' });

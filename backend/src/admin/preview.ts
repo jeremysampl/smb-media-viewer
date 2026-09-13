@@ -32,7 +32,14 @@ async function streamFile(
   res.setHeader('Cache-Control', 'private, max-age=60');
   await new Promise<void>((resolve, reject) => {
     const stream = fs.createReadStream(filePath);
-    stream.on('error', reject);
+    const cleanup = () => {
+      if (!stream.destroyed) stream.destroy();
+    };
+    res.on('close', cleanup);
+    stream.on('error', (error) => {
+      cleanup();
+      reject(error);
+    });
     stream.on('close', resolve);
     stream.pipe(res);
   });

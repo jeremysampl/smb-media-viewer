@@ -2,6 +2,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import path from 'node:path';
+import sharp from 'sharp';
 import { config } from './config.js';
 import authRoutes from './auth/routes.js';
 import browseRoutes from './routes/browse.js';
@@ -11,6 +12,9 @@ import adminRoutes from './routes/admin.js';
 import { startCacheCleanupJob } from './cache/cleanup.js';
 import { getIndexDb } from './index/db.js';
 import { QUALITY_PROFILES } from './media/quality.js';
+
+// Avoid holding SMB source files open across concurrent viewers
+sharp.cache({ files: 0 });
 
 const app = express();
 

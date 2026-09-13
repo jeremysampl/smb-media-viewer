@@ -1,4 +1,4 @@
-import exifr from 'exifr';
+import { parseExifFile } from './exif.js';
 
 /** Normalize EXIF/Samsung offsets like "+01:00", "+0100", "-4:00" to "+01:00". */
 export function normalizeUtcOffset(raw: string | undefined | null): string | undefined {
@@ -79,19 +79,17 @@ export function pickCaptureTime(exif: Record<string, unknown> | null): string | 
 }
 
 export async function getImageCaptureTime(sourcePath: string): Promise<string | undefined> {
-  const exif = (await exifr
-    .parse(sourcePath, {
-      pick: [
-        'DateTimeOriginal',
-        'CreateDate',
-        'ModifyDate',
-        'DateTime',
-        'OffsetTimeOriginal',
-        'OffsetTimeDigitized',
-        'OffsetTime',
-      ],
-    })
-    .catch(() => null)) as Record<string, unknown> | null;
+  const exif = await parseExifFile(sourcePath, {
+    pick: [
+      'DateTimeOriginal',
+      'CreateDate',
+      'ModifyDate',
+      'DateTime',
+      'OffsetTimeOriginal',
+      'OffsetTimeDigitized',
+      'OffsetTime',
+    ],
+  });
 
   return pickCaptureTime(exif);
 }
