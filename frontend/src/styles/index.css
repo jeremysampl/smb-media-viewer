@@ -2,6 +2,7 @@
 @import './primitives/motion.css';
 @import './base.css';
 @import './primitives/forms.css';
+@import './primitives/select-field.css';
 @import './primitives/buttons.css';
 @import './primitives/overlays.css';
 @import './features/browser.css';

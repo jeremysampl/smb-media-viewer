@@ -12,6 +12,7 @@ button {
   background: transparent;
   padding: 0;
   margin: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:disabled {
@@ -105,8 +106,9 @@ button:disabled {
 }
 
 .icon-btn {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   width: var(--control-h-sm);
   height: var(--control-h-sm);
@@ -117,7 +119,7 @@ button:disabled {
   background: rgba(255, 255, 255, 0.06);
   color: inherit;
   font-weight: 600;
-  line-height: 1;
+  line-height: 0;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   transition: background var(--duration-fast) ease;
@@ -131,6 +133,13 @@ button:disabled {
   width: var(--control-h-md);
   height: var(--control-h-md);
   min-width: var(--control-h-md);
+}
+
+.icon-btn svg,
+.btn svg,
+button svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 /* Alias for older className="secondary" usages */

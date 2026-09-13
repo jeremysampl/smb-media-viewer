@@ -2,6 +2,18 @@
   box-sizing: border-box;
 }
 
+/* Kill the gray flash on tap for controls (buttons also set this in buttons.css). */
+a,
+[role='button'],
+[role='menuitem'],
+summary,
+label,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
 html {
   font-family: var(--font-sans);
   line-height: 1.5;
@@ -37,8 +49,7 @@ body {
   box-shadow: var(--shadow-lg);
 }
 
-.login-card h1,
-.top-bar h1 {
+.login-card h1 {
   margin: 0;
   font-size: 1.8rem;
 }
@@ -90,8 +101,8 @@ body {
     padding-right: max(var(--space-2), env(safe-area-inset-right));
   }
 
-  .top-bar h1 {
-    font-size: 1.45rem;
+  .top-bar-eyebrow {
+    font-size: 0.66rem;
   }
 
   .breadcrumb-chip {
