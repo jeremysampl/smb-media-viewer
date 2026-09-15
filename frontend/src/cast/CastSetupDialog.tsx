@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -8,10 +9,11 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core';
 import {
-  restrictToParentElement,
   restrictToVerticalAxis,
+  restrictToFirstScrollableAncestor,
 } from '@dnd-kit/modifiers';
 import {
   SortableContext,
@@ -21,6 +23,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { LazyThumbnail } from '../browser/LazyThumbnail';
 import { MediaGallery } from '../gallery/MediaGallery';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -45,6 +48,11 @@ interface CastSetupDialogProps {
   onApply: () => void;
 }
 
+const QUEUE_ITEM_ESTIMATE = 58;
+const QUEUE_ITEM_GAP = 8;
+const VIRTUALIZE_AFTER = 36;
+const QUEUE_OVERSCAN = 12;
+
 function folderPath(path: string): string {
   const normalized = path.replace(/\\/g, '/');
   const idx = normalized.lastIndexOf('/');
@@ -62,41 +70,27 @@ function castItemsToBrowseEntries(items: CastItem[]): BrowseEntry[] {
   }));
 }
 
-function SortableCastItem({
+function CastQueueItemContent({
   item,
   layoutKey,
-  scrollRoot,
+  dragHandleProps,
   onRemove,
   onView,
 }: {
   item: CastItem;
   layoutKey: string | number;
-  scrollRoot: Element | null;
-  onRemove: () => void;
-  onView: () => void;
+  dragHandleProps?: Record<string, unknown>;
+  onRemove?: () => void;
+  onView?: () => void;
 }) {
-  const sortable = useSortable({ id: item.path });
-  const transform = sortable.transform
-    ? { ...sortable.transform, x: 0 }
-    : null;
   const folder = folderPath(item.path);
-
   return (
-    <li
-      ref={sortable.setNodeRef}
-      className="cast-queue-item"
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition: sortable.transition,
-        opacity: sortable.isDragging ? 0.6 : 1,
-      }}
-    >
+    <>
       <button
         type="button"
         className="cast-queue-handle"
         aria-label={`Move ${item.name}`}
-        {...sortable.attributes}
-        {...sortable.listeners}
+        {...dragHandleProps}
       >
         <span aria-hidden>☰</span>
       </button>
@@ -109,24 +103,220 @@ function SortableCastItem({
         <LazyThumbnail
           src={item.thumbnailUrl}
           alt=""
-          bufferRows={3}
+          bufferRows={2}
           layoutKey={layoutKey}
-          root={scrollRoot}
         />
       </button>
       <div className="cast-queue-item__meta">
         <span className="cast-queue-item__name" title={item.name}>{item.name}</span>
         <span className="cast-queue-item__path" title={folder}>{folder}</span>
       </div>
-      <button
-        type="button"
-        className="cast-queue-remove"
-        aria-label={`Remove ${item.name}`}
-        onClick={onRemove}
-      >
-        ×
-      </button>
+      {onRemove ? (
+        <button
+          type="button"
+          className="cast-queue-remove"
+          aria-label={`Remove ${item.name}`}
+          onClick={onRemove}
+        >
+          ×
+        </button>
+      ) : (
+        <span className="cast-queue-remove" aria-hidden />
+      )}
+    </>
+  );
+}
+
+function SortableCastItem({
+  item,
+  index,
+  layoutKey,
+  virtualStart,
+  measureRef,
+  onRemove,
+  onView,
+}: {
+  item: CastItem;
+  index: number;
+  layoutKey: string | number;
+  virtualStart?: number;
+  measureRef?: (node: HTMLElement | null) => void;
+  onRemove: () => void;
+  onView: () => void;
+}) {
+  const sortable = useSortable({ id: item.path });
+  const transform = sortable.transform
+    ? { ...sortable.transform, x: 0 }
+    : null;
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition: sortable.transition,
+    opacity: sortable.isDragging ? 0.35 : 1,
+    ...(virtualStart !== undefined
+      ? {
+          position: 'absolute',
+          top: virtualStart,
+          left: 0,
+          width: '100%',
+        }
+      : null),
+  };
+
+  return (
+    <li
+      ref={(node) => {
+        sortable.setNodeRef(node);
+        measureRef?.(node);
+      }}
+      className="cast-queue-item"
+      data-index={index}
+      style={style}
+    >
+      <CastQueueItemContent
+        item={item}
+        layoutKey={layoutKey}
+        dragHandleProps={{ ...sortable.attributes, ...sortable.listeners }}
+        onRemove={onRemove}
+        onView={onView}
+      />
     </li>
+  );
+}
+
+function CastQueueList({
+  items,
+  open,
+  onItemsChange,
+  onView,
+}: {
+  items: CastItem[];
+  open: boolean;
+  onItemsChange: (items: CastItem[]) => void;
+  onView: (index: number) => void;
+}) {
+  const isMobile = useIsMobile();
+  const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const itemIds = useMemo(() => items.map((item) => item.path), [items]);
+  const virtualize = items.length > VIRTUALIZE_AFTER;
+
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 6 } });
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 10 } });
+  const keyboardSensor = useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  });
+  const sensors = useSensors(
+    isMobile ? touchSensor : pointerSensor,
+    keyboardSensor,
+  );
+
+  const virtualizer = useVirtualizer({
+    count: virtualize ? items.length : 0,
+    getScrollElement: () => scrollRoot,
+    estimateSize: () => QUEUE_ITEM_ESTIMATE,
+    gap: QUEUE_ITEM_GAP,
+    overscan: QUEUE_OVERSCAN,
+    getItemKey: (index) => items[index]?.path ?? index,
+  });
+
+  const virtualItems = virtualize ? virtualizer.getVirtualItems() : null;
+  const rangeKey = virtualItems && virtualItems.length > 0
+    ? `${virtualItems[0].index}:${virtualItems[virtualItems.length - 1].index}`
+    : 'all';
+  const queueLayoutKey = `${open}:${items.length}:${rangeKey}`;
+
+  const activeItem = activeId
+    ? items.find((item) => item.path === activeId) ?? null
+    : null;
+
+  function finishDrag(event: DragEndEvent) {
+    setActiveId(null);
+    if (!event.over || event.active.id === event.over.id) return;
+    const from = items.findIndex((item) => item.path === event.active.id);
+    const to = items.findIndex((item) => item.path === event.over?.id);
+    if (from >= 0 && to >= 0) onItemsChange(arrayMove(items, from, to));
+  }
+
+  function onDragStart(event: DragStartEvent) {
+    setActiveId(String(event.active.id));
+  }
+
+  if (items.length === 0) {
+    return <ul className="cast-queue" />;
+  }
+
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor]}
+      onDragStart={onDragStart}
+      onDragCancel={() => setActiveId(null)}
+      onDragEnd={finishDrag}
+      autoScroll
+    >
+      <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+        <div
+          ref={setScrollRoot}
+          className={`cast-queue-scroller${virtualize ? ' is-virtual' : ''}`}
+        >
+          <ul
+            className="cast-queue"
+            style={
+              virtualize
+                ? {
+                    height: virtualizer.getTotalSize(),
+                    position: 'relative',
+                  }
+                : undefined
+            }
+          >
+            {virtualItems
+              ? virtualItems.map((virtualRow) => {
+                  const item = items[virtualRow.index];
+                  if (!item) return null;
+                  return (
+                    <SortableCastItem
+                      key={item.path}
+                      item={item}
+                      index={virtualRow.index}
+                      layoutKey={queueLayoutKey}
+                      virtualStart={virtualRow.start}
+                      measureRef={virtualizer.measureElement}
+                      onView={() => onView(virtualRow.index)}
+                      onRemove={() => onItemsChange(
+                        items.filter((candidate) => candidate.path !== item.path),
+                      )}
+                    />
+                  );
+                })
+              : items.map((item, index) => (
+                  <SortableCastItem
+                    key={item.path}
+                    item={item}
+                    index={index}
+                    layoutKey={queueLayoutKey}
+                    onView={() => onView(index)}
+                    onRemove={() => onItemsChange(
+                      items.filter((candidate) => candidate.path !== item.path),
+                    )}
+                  />
+                ))}
+          </ul>
+        </div>
+      </SortableContext>
+      <DragOverlay dropAnimation={null} style={{ zIndex: 12050 }}>
+        {activeItem ? (
+          <div className="cast-queue-item cast-queue-item--overlay">
+            <CastQueueItemContent
+              item={activeItem}
+              layoutKey={queueLayoutKey}
+            />
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
 
@@ -147,34 +337,12 @@ export function CastSetupDialog({
   onApply,
 }: CastSetupDialogProps) {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
-  const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   const previewOpen = previewIndex !== null;
   const previewEntries = useMemo(() => castItemsToBrowseEntries(items), [items]);
-  const queueLayoutKey = useMemo(
-    () => `${open}:${items.length}:${items.map((item) => item.path).join('\0')}`,
-    [open, items],
-  );
-  const isMobile = useIsMobile();
-  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 6 } });
-  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 10 } });
-  const keyboardSensor = useSensor(KeyboardSensor, {
-    coordinateGetter: sortableKeyboardCoordinates,
-  });
-  const sensors = useSensors(
-    isMobile ? touchSensor : pointerSensor,
-    keyboardSensor,
-  );
 
   useEffect(() => {
     if (!open) setPreviewIndex(null);
   }, [open]);
-
-  function finishDrag(event: DragEndEvent) {
-    if (!event.over || event.active.id === event.over.id) return;
-    const from = items.findIndex((item) => item.path === event.active.id);
-    const to = items.findIndex((item) => item.path === event.over?.id);
-    if (from >= 0 && to >= 0) onItemsChange(arrayMove(items, from, to));
-  }
 
   return (
     <>
@@ -185,7 +353,7 @@ export function CastSetupDialog({
         className="cast-setup"
         closeOnEscape={!previewOpen}
       >
-        <div className="cast-setup-body" ref={setScrollRoot}>
+        <div className="cast-setup-body">
           <div className="cast-mode-toggle" role="group" aria-label="Cast mode">
             <button
               type="button"
@@ -269,27 +437,13 @@ export function CastSetupDialog({
             <strong>Queue</strong>
             <span>{items.length} item{items.length === 1 ? '' : 's'}</span>
           </div>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-            onDragEnd={finishDrag}
-          >
-            <SortableContext items={items.map((item) => item.path)} strategy={verticalListSortingStrategy}>
-              <ul className="cast-queue">
-                {items.map((item, index) => (
-                  <SortableCastItem
-                    key={item.path}
-                    item={item}
-                    layoutKey={queueLayoutKey}
-                    scrollRoot={scrollRoot}
-                    onView={() => setPreviewIndex(index)}
-                    onRemove={() => onItemsChange(items.filter((candidate) => candidate.path !== item.path))}
-                  />
-                ))}
-              </ul>
-            </SortableContext>
-          </DndContext>
+
+          <CastQueueList
+            items={items}
+            open={open}
+            onItemsChange={onItemsChange}
+            onView={setPreviewIndex}
+          />
 
           {loading ? <p className="cast-status">Preparing photos...</p> : null}
           {error ? <p className="error">{error}</p> : null}

@@ -65,23 +65,47 @@ export function LazyThumbnail({
     const element = ref.current;
     if (!element) return undefined;
 
+    let frame = 0;
     const update = () => {
       setInView(isNearRoot(element, root, marginFor(element, bufferRows)));
     };
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        update();
+      });
+    };
 
+    const margin = marginFor(element, bufferRows);
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setInView(entry.isIntersecting);
+        // Prefer geometry check: IO can miss abs-positioned / transformed moves
+        // inside nested scrollers (virtual lists).
+        if (entry.isIntersecting) {
+          setInView(true);
+          return;
+        }
+        update();
       },
       {
         root,
-        rootMargin: `${marginFor(element, bufferRows)}px 0px`,
+        rootMargin: `${margin}px 0px`,
       },
     );
     observer.observe(element);
     update();
 
-    return () => observer.disconnect();
+    const scrollTarget: Element | Window = root ?? window;
+    scrollTarget.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+
+    return () => {
+      observer.disconnect();
+      scrollTarget.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, [bufferRows, layoutKey, src, root]);
 
   useLayoutEffect(() => {

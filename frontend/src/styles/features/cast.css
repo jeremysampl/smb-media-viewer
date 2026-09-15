@@ -87,6 +87,15 @@
   font-size: 0.85rem;
 }
 
+.cast-queue-scroller {
+  max-height: min(20rem, 40dvh);
+  min-height: 3rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 .cast-queue {
   display: grid;
   gap: var(--space-2);
@@ -97,8 +106,15 @@
   list-style: none;
 }
 
+.cast-queue-scroller.is-virtual .cast-queue {
+  display: block;
+  gap: 0;
+  overflow: visible;
+}
+
 .cast-queue:empty::after {
   content: 'Select photos, videos, or a folder to begin.';
+  display: block;
   padding: var(--space-6);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
@@ -111,10 +127,17 @@
   grid-template-columns: 2rem 2.5rem minmax(0, 1fr) 2rem;
   align-items: center;
   gap: var(--space-3);
+  box-sizing: border-box;
   padding: 0.45rem var(--space-2);
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-md);
   background: var(--color-surface-inset);
+}
+
+.cast-queue-item--overlay {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  cursor: grabbing;
+  touch-action: none;
 }
 
 .cast-queue-thumb {
