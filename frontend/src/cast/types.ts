@@ -7,6 +7,8 @@ export interface CastItem {
   token: string;
   mediaToken: string;
   contentType: string;
+  /** Playback quality for cast media URLs / prepare status. */
+  quality?: string;
   url: string;
   thumbnailUrl: string;
 }

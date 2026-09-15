@@ -155,11 +155,11 @@ function absoluteMediaUrl(path: string, mediaOrigin: string): string {
   return new URL(path, origin).href;
 }
 
-async function waitForCastVideo(token: string): Promise<void> {
+async function waitForCastVideo(token: string, quality: string): Promise<void> {
   const started = Date.now();
   let prepare = true;
   while (Date.now() - started < 10 * 60 * 1000) {
-    const status = await fetchCastVideoStatus(token, 'high', prepare);
+    const status = await fetchCastVideoStatus(token, quality, prepare);
     prepare = false;
     if (status.state === 'ready') return;
     await new Promise((resolve) => window.setTimeout(resolve, 700));
@@ -395,7 +395,11 @@ export function CastProvider({ children }: { children: ReactNode }) {
     clearMediaListener();
     if (item.kind === 'video') {
       setError('Preparing video for Cast...');
-      await waitForCastVideo(item.token);
+      const quality =
+        item.quality
+        ?? new URL(item.url, 'http://local').searchParams.get('quality')
+        ?? 'full';
+      await waitForCastVideo(item.token, quality);
     }
 
     const mediaInfo = new chrome.cast.media.MediaInfo(

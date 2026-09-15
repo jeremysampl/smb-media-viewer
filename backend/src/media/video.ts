@@ -15,6 +15,10 @@ import {
   findTrackedJob,
 } from '../jobs/tracker.js';
 import { registerCacheEntry, recordCacheAccess } from '../cache/meta.js';
+import {
+  assessDirectPlayVideo,
+  type DirectPlayTarget,
+} from './videoCompatibility.js';
 
 const inflight = new Map<
   string,
@@ -92,8 +96,19 @@ function runFfmpeg(
 export async function getTranscodedVideo(
   sourcePath: string,
   quality: QualityTier,
+  options?: { directPlayTarget?: DirectPlayTarget },
 ): Promise<{ filePath: string; contentType: string }> {
   const stats = await fs.stat(sourcePath);
+  const directPlayTarget = options?.directPlayTarget ?? 'browser';
+
+  // Full: stream the original when already playable for this target
+  if (quality === 'full') {
+    const direct = await assessDirectPlayVideo(sourcePath, directPlayTarget);
+    if (direct.ok) {
+      return { filePath: sourcePath, contentType: direct.contentType };
+    }
+  }
+
   const key = buildCacheKey(sourcePath, stats.mtimeMs, quality, 'video');
   const cachePath = getCachePath('videos', key, '.mp4');
 
@@ -145,6 +160,7 @@ export async function getTranscodedVideo(
           '128k',
         );
       } else {
+        // Incompatible Full originals: remux to MP4, copy video, AAC audio
         args.push('-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k');
       }
 
@@ -198,7 +214,16 @@ export type VideoTranscodeStatus = {
 export async function getVideoTranscodeStatus(
   sourcePath: string,
   quality: QualityTier,
+  options?: { directPlayTarget?: DirectPlayTarget },
 ): Promise<VideoTranscodeStatus> {
+  const directPlayTarget = options?.directPlayTarget ?? 'browser';
+  if (quality === 'full') {
+    const direct = await assessDirectPlayVideo(sourcePath, directPlayTarget);
+    if (direct.ok) {
+      return { state: 'ready', progress: 1 };
+    }
+  }
+
   const stats = await fs.stat(sourcePath);
   const key = buildCacheKey(sourcePath, stats.mtimeMs, quality, 'video');
   const cachePath = getCachePath('videos', key, '.mp4');
@@ -225,8 +250,9 @@ export async function getVideoTranscodeStatus(
 export function ensureTranscodedVideo(
   sourcePath: string,
   quality: QualityTier,
+  options?: { directPlayTarget?: DirectPlayTarget },
 ): void {
-  void getTranscodedVideo(sourcePath, quality).catch((error) => {
+  void getTranscodedVideo(sourcePath, quality, options).catch((error) => {
     console.error('Background video prepare failed:', error);
   });
 }

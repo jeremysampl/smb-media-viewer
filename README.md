@@ -19,7 +19,7 @@ Self-hosted media gallery for OpenMediaVault NAS shares. Users sign in with thei
 | Medium | 1280px WebP | 720p |
 | High | 1920px WebP | 1080p |
 | Very High | 2560px WebP | 1440p |
-| Full | Original file when browser-native (JPEG/PNG/GIF/WebP/AVIF/BMP); otherwise WebP convert (HEIC/TIFF/…) | Remux/transcode |
+| Full | Original file when browser-native (JPEG/PNG/GIF/WebP/AVIF/BMP); otherwise WebP convert (HEIC/TIFF/…) | Original when already playable (H.264/HEVC/VP9/AV1 + common audio in MP4/WebM); otherwise remux to MP4 |
 
 Transcodes for the lightbox are cached on disk under `CACHE_DIR` and may be evicted when the cache exceeds `CACHE_MAX_BYTES`.
 
@@ -52,7 +52,7 @@ chrome://flags/#unsafely-treat-insecure-origin-as-secure
 
 Add `http://192.168.1.50:5173`, enable the flag, relaunch Chrome.
 
-Keep the sender tab open while a slideshow is playing because the browser controls the timer. The app uses Google's Default Media Receiver. Photos are signed JPEG URLs; videos are Cast-friendly MP4s (transcoded on first play if needed). Custom fade/slide transitions need a custom receiver. iOS Cast is not supported.
+Keep the sender tab open while a slideshow is playing because the browser controls the timer. The app uses Google's Default Media Receiver. Photos are signed JPEG URLs; videos stream as-is when already playable (H.264/HEVC/VP9/AV1 + common audio in MP4/WebM), otherwise remux to MP4 on first play if needed. Custom fade/slide transitions need a custom receiver. iOS Cast is not supported.
 
 ## Prerequisites (OMV host)
 
@@ -254,7 +254,7 @@ Set `ADMIN_USERS=alice,bob` (Samba usernames, comma-separated) to enable `/admin
   4. Check backend logs: `docker logs smb-media-viewer-backend 2>&1 | grep shares`: you should see `Loaded N share(s)`. If N>0 but the UI is empty, the user failed the `valid users` / group ACL filter (primary group `@users` is now supported).
 - **Shares appear but folders look empty / Path not found**: the `path =` in Samba does not match a mounted host directory inside the container. Align volume mounts with `testparm -s` paths.
 - **Login fails for valid users**: confirm `smbclient` works on the host and `SMB_HOST` is reachable from the backend container (`127.0.0.1` with host networking).
-- **Videos won't play**: first view triggers ffmpeg transcode; wait for cache generation or try a lower quality tier.
+- **Videos won't play**: Full quality streams originals when already H.264+AAC MP4/MOV; otherwise the first view remuxes/transcodes. Wait for cache generation or try a lower quality tier.
 - **High CPU usage**: lower default quality tier and reduce concurrent viewers; cache warms up over time.
 - **Date sort looks wrong on first open**: while indexing is active the grid keeps mtime order so thumbs don’t reshuffle; after indexing finishes it switches to capture time (data lives under `INDEX_DIR`).
 - **Slow first thumbnail row**: grid thumbs are generated into `INDEX_DIR` on demand / while indexing (capped by `INDEX_CONCURRENCY`); they are permanent afterward.

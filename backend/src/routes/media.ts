@@ -143,7 +143,11 @@ router.get('/:token/video', async (req: AuthenticatedRequest, res) => {
   try {
     const result = await getTranscodedVideo(sourcePath, quality);
     const rangeHeader = req.headers.range;
-    const ranged = streamFileWithRange(result.filePath, rangeHeader);
+    const ranged = streamFileWithRange(
+      result.filePath,
+      rangeHeader,
+      result.contentType,
+    );
     res.status(ranged.status);
     for (const [key, value] of Object.entries(ranged.headers)) {
       res.setHeader(key, value);

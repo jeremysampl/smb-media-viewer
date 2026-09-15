@@ -117,7 +117,7 @@ export async function stopAdminCastSessions(input: {
 
 export async function fetchCastVideoStatus(
   token: string,
-  quality = 'high',
+  quality = 'full',
   prepare = true,
 ): Promise<{ state: 'ready' | 'processing' | 'missing'; progress: number | null }> {
   const params = new URLSearchParams({

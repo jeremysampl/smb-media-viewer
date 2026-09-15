@@ -22,6 +22,7 @@ import { getVideoPoster } from '../media/poster.js';
 import { isQualityTier } from '../media/quality.js';
 import { createCastToken, createMediaToken, verifyCastToken } from '../media/tokens.js';
 import { getTranscodedVideo, ensureTranscodedVideo, getVideoTranscodeStatus } from '../media/video.js';
+import { assessDirectPlayVideo } from '../media/videoCompatibility.js';
 import { resolveAbsolutePath, resolveShareForPath } from '../permissions/resolver.js';
 import { pipeFileStream } from '../util/pipeFileStream.js';
 import type { QualityTier } from '../types.js';
@@ -112,6 +113,7 @@ interface CastItem {
   token: string;
   mediaToken: string;
   contentType: string;
+  quality?: string;
   url: string;
   thumbnailUrl: string;
 }
@@ -195,17 +197,21 @@ router.get('/:token/video-status', async (req, res) => {
     return;
   }
 
-  const quality = castQuality(req.query.quality, 'high');
+  const quality = castQuality(req.query.quality, 'full');
   const prepare =
     req.query.prepare === '1'
     || req.query.prepare === 'true'
     || req.query.prepare === 'yes';
 
   try {
-    let status = await getVideoTranscodeStatus(auth.sourcePath, quality);
+    let status = await getVideoTranscodeStatus(auth.sourcePath, quality, {
+      directPlayTarget: 'cast',
+    });
     if (status.state === 'missing' && prepare) {
-      ensureTranscodedVideo(auth.sourcePath, quality);
-      status = await getVideoTranscodeStatus(auth.sourcePath, quality);
+      ensureTranscodedVideo(auth.sourcePath, quality, { directPlayTarget: 'cast' });
+      status = await getVideoTranscodeStatus(auth.sourcePath, quality, {
+        directPlayTarget: 'cast',
+      });
       if (status.state === 'missing') {
         status = { state: 'processing', progress: null };
       }
@@ -226,7 +232,11 @@ router.get('/:token/video', async (req, res) => {
   }
 
   try {
-    const video = await getTranscodedVideo(auth.sourcePath, castQuality(req.query.quality, 'high'));
+    const video = await getTranscodedVideo(
+      auth.sourcePath,
+      castQuality(req.query.quality, 'full'),
+      { directPlayTarget: 'cast' },
+    );
     const ranged = streamFileWithRange(video.filePath, req.headers.range, video.contentType);
     res.status(ranged.status);
     for (const [key, value] of Object.entries(ranged.headers)) {
@@ -344,33 +354,40 @@ router.post('/resolve', authMiddleware, async (req: AuthenticatedRequest, res) =
     return;
   }
 
-  const items: CastItem[] = [...found.values()].map(({ absolutePath, browsePath, kind }) => {
+  const items: CastItem[] = [];
+  for (const { absolutePath, browsePath, kind } of found.values()) {
     const token = createCastToken(absolutePath, username, sessionId || undefined);
     const mediaToken = createMediaToken(absolutePath, username);
     const encoded = encodeURIComponent(token);
     if (kind === 'video') {
-      return {
+      // Stream original when Cast-playable; otherwise remux at Full (cheap) instead of 1080p re-encode.
+      const direct = await assessDirectPlayVideo(absolutePath, 'cast');
+      const quality: QualityTier = 'full';
+      items.push({
         path: browsePath,
         name: path.basename(absolutePath),
         kind,
         token,
         mediaToken,
-        contentType: 'video/mp4',
-        url: `/api/cast/${encoded}/video?quality=high`,
+        contentType: direct.ok ? direct.contentType : 'video/mp4',
+        quality,
+        url: `/api/cast/${encoded}/video?quality=${quality}`,
         thumbnailUrl: `/api/cast/${encoded}/poster`,
-      };
+      });
+      continue;
     }
-    return {
+    items.push({
       path: browsePath,
       name: path.basename(absolutePath),
       kind,
       token,
       mediaToken,
       contentType: 'image/jpeg',
+      quality: 'high',
       url: `/api/cast/${encoded}/image?quality=high`,
       thumbnailUrl: `/api/cast/${encoded}/image?quality=very_low`,
-    };
-  });
+    });
+  }
 
   res.json({ items });
 });
