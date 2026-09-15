@@ -8,6 +8,7 @@ import authRoutes from './auth/routes.js';
 import browseRoutes from './routes/browse.js';
 import mediaRoutes from './routes/media.js';
 import downloadRoutes from './routes/download.js';
+import castRoutes from './routes/cast.js';
 import adminRoutes from './routes/admin.js';
 import { startCacheCleanupJob } from './cache/cleanup.js';
 import { getIndexDb } from './index/db.js';
@@ -37,6 +38,7 @@ app.get('/api/quality', (_req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/cast', castRoutes);
 app.use('/api', browseRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/download', downloadRoutes);

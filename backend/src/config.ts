@@ -55,5 +55,11 @@ export const config = {
   indexConcurrency: Math.max(1, Number(process.env.INDEX_CONCURRENCY ?? 2)),
   tokenSecret: requireEnv('TOKEN_SECRET', 'change-me-token-secret'),
   frontendOrigin,
+  /**
+   * Origin Chromecast should use for media URLs (e.g. http://192.168.1.50:5173).
+   * Use this when the browser page is on localhost (Cast API works) but media must
+   * be fetched from a LAN address the TV can reach.
+   */
+  castPublicOrigin: process.env.CAST_PUBLIC_ORIGIN?.trim() || '',
   libreOfficeBin: process.env.LIBREOFFICE_BIN ?? 'soffice',
 };

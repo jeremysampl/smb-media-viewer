@@ -5,12 +5,13 @@ import { useAuth } from '../auth/AuthContext';
 import { UserMenu } from '../browser/UserMenu';
 import { Button } from '../ui';
 import { CachePanel } from './CachePanel';
+import { CastsPanel } from './CastsPanel';
 import { formatBytes, formatDuration } from './format';
 import { IndexPanel } from './IndexPanel';
 import { JobsPanel } from './JobsPanel';
 import { ProgressBar } from './ProgressBar';
 
-type AdminSection = 'overview' | 'jobs' | 'cache' | 'index';
+type AdminSection = 'overview' | 'jobs' | 'casts' | 'cache' | 'index';
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
@@ -92,6 +93,7 @@ export function AdminPage() {
           [
             ['overview', 'Overview'],
             ['jobs', 'Jobs'],
+            ['casts', 'Casts'],
             ['cache', 'Cache'],
             ['index', 'Index'],
           ] as const
@@ -226,6 +228,20 @@ export function AdminPage() {
       ) : null}
 
       {status && section === 'jobs' ? <JobsPanel status={status} now={now} /> : null}
+      {status && section === 'casts' ? (
+        <CastsPanel
+          status={status}
+          now={now}
+          onChanged={() => {
+            void getAdminStatus()
+              .then((next) => {
+                setStatus(next);
+                setNow(Date.now());
+              })
+              .catch(() => undefined);
+          }}
+        />
+      ) : null}
       {section === 'cache' ? <CachePanel active={section === 'cache'} now={now} /> : null}
       {section === 'index' ? (
         <IndexPanel

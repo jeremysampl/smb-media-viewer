@@ -10,6 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@tanstack/react-virtual": "^3.14.7",
     "dompurify": "^3.4.14",
     "katex": "^0.18.4",
@@ -23,6 +27,7 @@
     "yet-another-react-lightbox": "^3.32.0"
   },
   "devDependencies": {
+    "@types/chromecast-caf-sender": "^1.0.11",
     "@types/dompurify": "^3.0.5",
     "@types/katex": "^0.16.8",
     "@types/node": "^24.13.2",

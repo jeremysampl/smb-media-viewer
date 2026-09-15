@@ -23,6 +23,8 @@ interface DesktopLightboxProps {
   initialIndex: number;
   open: boolean;
   onClose: () => void;
+  onIndexChange?: (index: number) => void;
+  className?: string;
 }
 
 const DetailsIcon = createIcon(
@@ -162,6 +164,8 @@ export function DesktopLightbox({
   initialIndex,
   open,
   onClose,
+  onIndexChange,
+  className = '',
 }: DesktopLightboxProps) {
   const { quality, setQuality, profiles } = useQualityPreference();
   const [index, setIndex] = useState(initialIndex);
@@ -275,6 +279,7 @@ export function DesktopLightbox({
       open={open}
       close={onClose}
       index={index}
+      className={className || undefined}
       slides={slides as never}
       plugins={[Video, Zoom]}
       zoom={{ scrollToZoom: true, maxZoomPixelRatio: 4, maxZoom: 20 }}
@@ -290,7 +295,12 @@ export function DesktopLightbox({
           'close',
         ],
       }}
-      on={{ view: ({ index: nextIndex }) => setIndex(nextIndex) }}
+      on={{
+        view: ({ index: nextIndex }) => {
+          setIndex(nextIndex);
+          onIndexChange?.(nextIndex);
+        },
+      }}
       controller={{ closeOnBackdropClick: true }}
       carousel={{ finite: mediaEntries.length <= 1, preload: 1 }}
       animation={{ swipe: 500 }}

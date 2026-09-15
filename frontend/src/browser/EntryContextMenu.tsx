@@ -21,6 +21,9 @@ interface EntryContextMenuProps {
   onView: () => void;
   onDownloadOne: () => void;
   onDownloadSelected: () => void;
+  onCastOne: () => void;
+  onCastSelected: () => void;
+  castConnected: boolean;
 }
 
 export function EntryContextMenu({
@@ -36,6 +39,9 @@ export function EntryContextMenu({
   onView,
   onDownloadOne,
   onDownloadSelected,
+  onCastOne,
+  onCastSelected,
+  castConnected,
 }: EntryContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const canView =
@@ -104,6 +110,13 @@ export function EntryContextMenu({
           <button type="button" role="menuitem" onClick={() => run(onDownloadOne)}>
             Download
           </button>
+          {(menu.entry.type === 'folder'
+            || menu.entry.type === 'image'
+            || menu.entry.type === 'video') ? (
+            <button type="button" role="menuitem" onClick={() => run(onCastOne)}>
+              {castConnected ? 'Add to Cast' : 'Cast'}
+            </button>
+          ) : null}
         </>
       ) : (
         <>
@@ -124,6 +137,14 @@ export function EntryContextMenu({
             onClick={() => run(onDownloadSelected)}
           >
             Download selected ({selectedCount})
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={selectedCount === 0}
+            onClick={() => run(onCastSelected)}
+          >
+            {castConnected ? 'Add selected to Cast' : `Cast selected (${selectedCount})`}
           </button>
           {canView ? (
             <button type="button" role="menuitem" onClick={() => run(onView)}>

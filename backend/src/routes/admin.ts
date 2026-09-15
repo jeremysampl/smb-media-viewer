@@ -14,6 +14,7 @@ import {
 } from '../index/db.js';
 import { getIndexQueueStatus } from '../index/indexer.js';
 import { listRecentJobs, listTrackedJobs } from '../jobs/tracker.js';
+import { listCastSessions, requestStopCastSessions } from '../cast/sessions.js';
 import { getSystemMetrics } from '../util/systemMetrics.js';
 import {
   getDisplayFileKind,
@@ -49,6 +50,7 @@ router.get('/status', async (_req: AuthenticatedRequest, res) => {
   const index = getIndexQueueStatus();
   const mediaJobs = listTrackedJobs();
   const recentJobs = listRecentJobs();
+  const castSessions = listCastSessions();
 
   res.json({
     generatedAt: Date.now(),
@@ -60,6 +62,24 @@ router.get('/status', async (_req: AuthenticatedRequest, res) => {
     },
     mediaJobs,
     recentJobs,
+    castSessions,
+  });
+});
+
+router.post('/cast/sessions/stop', (req: AuthenticatedRequest, res) => {
+  const all = Boolean(req.body?.all);
+  const ids = Array.isArray(req.body?.ids)
+    ? req.body.ids.filter((value: unknown): value is string => typeof value === 'string')
+    : [];
+  if (!all && ids.length === 0) {
+    res.status(400).json({ error: 'Provide ids or all: true' });
+    return;
+  }
+  const result = requestStopCastSessions(all ? undefined : ids);
+  res.json({
+    ok: true,
+    stopped: result.stopped,
+    sessions: listCastSessions(),
   });
 });
 

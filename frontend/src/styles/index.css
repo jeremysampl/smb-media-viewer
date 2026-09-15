@@ -5,8 +5,10 @@
 @import './primitives/select-field.css';
 @import './primitives/buttons.css';
 @import './primitives/loader.css';
+@import './primitives/slider.css';
 @import './primitives/overlays.css';
 @import './features/browser.css';
 @import './features/gallery.css';
+@import './features/cast.css';
 @import './features/admin.css';
 @import './features/viewer.css';

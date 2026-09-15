@@ -50,3 +50,9 @@ export interface MediaTokenPayload {
   username: string;
   exp: number;
 }
+
+export interface CastTokenPayload extends MediaTokenPayload {
+  purpose: 'cast';
+  /** Active cast session id used for admin stop / revoke. */
+  sid?: string;
+}

@@ -132,3 +132,55 @@ export async function getThumbnailImage(
 ): Promise<{ filePath: string; contentType: string }> {
   return getResizedImage(sourcePath, 'very_low');
 }
+
+const castImageInFlight = new Map<string, Promise<{ filePath: string; contentType: string }>>();
+
+export async function getCastImage(
+  sourcePath: string,
+  quality: QualityTier,
+): Promise<{ filePath: string; contentType: string }> {
+  const stats = await fs.stat(sourcePath);
+  const key = buildCacheKey(sourcePath, stats.mtimeMs, quality, 'cast-image');
+  const cachePath = getCachePath('cast-images', key, '.jpg');
+  const cached = await readCacheEntry(cachePath);
+  if (cached) {
+    recordCacheAccess(cachePath);
+    return { filePath: cached.filePath, contentType: 'image/jpeg' };
+  }
+
+  const existing = castImageInFlight.get(key);
+  if (existing) return existing;
+
+  const work = withTrackedJob(
+    { kind: 'image_resize', path: sourcePath, size: stats.size, quality },
+    async (jobId) => {
+      const maxDimension = getQualityProfile(quality).imageMaxDimension;
+      let pipeline = sharp(sourcePath, { failOn: 'none', sequentialRead: false })
+        .rotate()
+        .flatten({ background: '#000000' });
+      if (maxDimension) {
+        pipeline = pipeline.resize({
+          width: maxDimension,
+          height: maxDimension,
+          fit: 'inside',
+          withoutEnlargement: true,
+        });
+      }
+      await writeAtomic(cachePath, await pipeline.jpeg({ quality: 88 }).toBuffer());
+      const outputSize = (await fs.stat(cachePath)).size;
+      setTrackedJobOutputSize(jobId, outputSize);
+      registerCacheEntry({
+        cachePath,
+        sourcePath,
+        kind: 'image',
+        quality,
+        size: outputSize,
+      });
+      recordCacheAccess(cachePath);
+      return { filePath: cachePath, contentType: 'image/jpeg' };
+    },
+  ).finally(() => castImageInFlight.delete(key));
+
+  castImageInFlight.set(key, work);
+  return work;
+}

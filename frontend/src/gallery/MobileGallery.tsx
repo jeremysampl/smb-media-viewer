@@ -34,6 +34,8 @@ interface MobileGalleryProps {
   initialIndex: number;
   open: boolean;
   onClose: () => void;
+  onIndexChange?: (index: number) => void;
+  className?: string;
 }
 
 const SWIPE_THRESHOLD = 72;
@@ -282,6 +284,8 @@ export function MobileGallery({
   initialIndex,
   open,
   onClose,
+  onIndexChange,
+  className = '',
 }: MobileGalleryProps) {
   const { quality, setQuality, profiles } = useQualityPreference();
   const [index, setIndex] = useState(initialIndex);
@@ -452,11 +456,12 @@ export function MobileGallery({
     const delta = nextIndex - current;
     const carryOffset = offsetX - delta * step;
     setIndex(nextIndex);
+    onIndexChange?.(nextIndex);
     setDragOffset({ x: carryOffset, y: 0 });
     requestAnimationFrame(() => {
       setDragOffset({ x: 0, y: 0 });
     });
-  }, []);
+  }, [onIndexChange]);
 
   const qualityRef = useRef(quality);
   qualityRef.current = quality;
@@ -1052,7 +1057,7 @@ export function MobileGallery({
         isClosing ? ' closing' : ''
       }${isOpening ? ' opening' : ''}${isSheetDragging ? ' sheet-dragging' : ''}${
         detailsOpen || sheetHeight > 0 ? ' details-open' : ''
-      }`}
+      }${className ? ` ${className}` : ''}`}
       role="dialog"
       aria-modal="true"
       style={

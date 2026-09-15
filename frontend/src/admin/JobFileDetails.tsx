@@ -11,7 +11,7 @@ import { createPortal } from 'react-dom';
 import { getFormatLabel } from '@smb/file-types';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { FileThumb } from '../files/FileThumb';
-import { Button, CloseIcon } from '../ui';
+import { Button, CloseIcon, Modal } from '../ui';
 
 export function adminPreviewUrl(absolutePath: string): string {
   return `/api/admin/preview?path=${encodeURIComponent(absolutePath)}`;
@@ -48,7 +48,6 @@ export function JobFileDetails({
   const hoverTimer = useRef<number | undefined>(undefined);
   const closeTimer = useRef<number | undefined>(undefined);
   const panelId = useId();
-  const titleId = useId();
   const folder = parentPath(path);
   const resolvedFormat = format ?? getFormatLabel(path);
 
@@ -97,9 +96,11 @@ export function JobFileDetails({
     if (!open) return undefined;
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (isMobile) return;
       if (event.key === 'Escape') close();
     };
     const onPointerDown = (event: PointerEvent) => {
+      if (isMobile) return;
       const target = event.target as Node;
       if (rootRef.current?.contains(target) || cardRef.current?.contains(target)) {
         return;
@@ -113,7 +114,7 @@ export function JobFileDetails({
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('pointerdown', onPointerDown);
     };
-  }, [open, close]);
+  }, [open, close, isMobile]);
 
   useEffect(() => {
     return () => {
@@ -232,39 +233,36 @@ export function JobFileDetails({
 
       {isMobile && open
         ? createPortal(
-            <div
-              className="admin-job-sheet-root"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby={titleId}
-            >
-              <button
-                type="button"
-                className="admin-job-sheet-backdrop"
-                aria-label="Close"
-                onClick={close}
-              />
-              <div className="admin-job-sheet" id={panelId} ref={cardRef}>
-                <div className="admin-job-sheet-handle" aria-hidden />
-                <div className="admin-job-sheet-header">
-                  <div className="admin-job-sheet-heading">
-                    <p className="admin-job-sheet-eyebrow">File preview</p>
-                    <h2 id={titleId}>{label}</h2>
+            <Modal
+              open
+              title={label}
+              onClose={close}
+              className="admin-job-sheet"
+              backdropClassName="admin-job-sheet-backdrop"
+              header={(titleId) => (
+                <>
+                  <div className="admin-job-sheet-handle" aria-hidden />
+                  <div className="admin-job-sheet-header">
+                    <div className="admin-job-sheet-heading">
+                      <p className="admin-job-sheet-eyebrow">File preview</p>
+                      <h2 id={titleId}>{label}</h2>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="admin-job-sheet-close"
+                      aria-label="Close preview"
+                      onClick={close}
+                    >
+                      <CloseIcon size={16} />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="admin-job-sheet-close"
-                    aria-label="Close preview"
-                    onClick={close}
-                  >
-                    <CloseIcon size={16} />
-                  </Button>
-                </div>
-                {preview}
-                <div className="admin-job-preview-meta">{pathBlock}</div>
-              </div>
-            </div>,
+                </>
+              )}
+            >
+              {preview}
+              <div className="admin-job-preview-meta">{pathBlock}</div>
+            </Modal>,
             document.body,
           )
         : null}

@@ -4,6 +4,7 @@ import { useAuth } from './auth/AuthContext';
 import { LoginPage } from './auth/LoginPage';
 import { BrowserPage } from './browser/BrowserPage';
 import { QualityPreferenceProvider } from './browser/ResolutionSelector';
+import { CastProvider } from './cast/CastProvider';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { username, loading } = useAuth();
@@ -21,7 +22,8 @@ export default function App() {
 
   return (
     <QualityPreferenceProvider>
-      <Routes>
+      <CastProvider>
+        <Routes>
         <Route
           path="/login"
           element={username ? <Navigate to="/" replace /> : <LoginPage />}
@@ -42,7 +44,8 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-      </Routes>
+        </Routes>
+      </CastProvider>
     </QualityPreferenceProvider>
   );
 }

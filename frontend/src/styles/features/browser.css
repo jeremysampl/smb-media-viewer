@@ -49,6 +49,13 @@
   line-height: 1.15;
 }
 
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+}
+
 .user-menu {
   position: relative;
   flex: 0 0 auto;
@@ -224,6 +231,33 @@
   pointer-events: none;
 }
 
+.browser-nav-mobile-tools {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.browser-nav-mobile-tools .browser-options-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.browser-cast-btn {
+  align-self: stretch;
+  width: 3.1rem;
+  min-width: 3.1rem;
+  height: auto;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.browser-cast-btn:hover:not(:disabled) {
+  border-color: var(--color-border-accent);
+  background: var(--color-surface-3);
+}
+
 .browser-options-btn {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -390,69 +424,6 @@
 
 .details-toggle .slider-toggle {
   justify-self: end;
-}
-
-.slider-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  color: var(--color-text-soft);
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-}
-
-.slider-toggle-label {
-  font-size: 0.9rem;
-}
-
-.slider-toggle-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.slider-toggle-track {
-  position: relative;
-  display: inline-block;
-  width: 2.35rem;
-  height: 1.3rem;
-  border-radius: var(--radius-pill);
-  background: var(--color-track);
-  border: 1px solid var(--color-border-strong);
-  transition: background var(--duration) ease, border-color var(--duration) ease;
-}
-
-.slider-toggle-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 0.95rem;
-  height: 0.95rem;
-  border-radius: 50%;
-  background: var(--color-text);
-  box-shadow: 0 1px 4px var(--color-shadow);
-  transition: transform var(--duration) ease;
-}
-
-.slider-toggle-input:checked + .slider-toggle-track {
-  background: var(--color-accent-gradient);
-  border-color: transparent;
-}
-
-.slider-toggle-input:checked + .slider-toggle-track .slider-toggle-thumb {
-  transform: translateX(1.05rem);
-}
-
-.slider-toggle-input:focus-visible + .slider-toggle-track {
-  outline: 2px solid var(--color-accent-soft);
-  outline-offset: 2px;
 }
 
 .file-card.compact {
@@ -937,6 +908,18 @@ button.breadcrumb-chip:focus-visible,
 
 .browser-page.has-selection-dock {
   padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.browser-page.has-cast-bar {
+  padding-bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.browser-page.has-selection-dock.has-cast-bar {
+  padding-bottom: calc(14rem + env(safe-area-inset-bottom, 0px));
+}
+
+.browser-page.has-cast-bar .selection-dock {
+  bottom: calc(6.2rem + env(safe-area-inset-bottom, 0px));
 }
 
 .browser-page.has-selection-dock .index-snackbar {

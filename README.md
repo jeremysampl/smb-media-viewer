@@ -31,6 +31,29 @@ The index is not size-capped. Folder browse returns as soon as directory listing
 
 Configure both locations via env (`CACHE_DIR`, `INDEX_DIR`). In Docker Compose these map to `smb_media_cache` and `smb_media_index` volumes.
 
+## Google Cast slideshows
+
+Select photos, videos, or folders and choose **Cast** to build a slideshow queue. Selected folders include nested media. The queue can be reordered, shuffled, repeated, changed while playing, or switched to **Pick photos** mode for manual control. Videos play through, then the slideshow advances.
+
+Casting requires Chrome, Edge, or Android Chrome. Google only enables the Cast sender API on secure pages (`https://` or `localhost`). Plain `http://192.168.x.x` pages usually show Cast as unavailable.
+
+Recommended LAN setup:
+
+1. Run the frontend with host binding (`npm run dev -- --host`).
+2. Open the app on `http://localhost:5173` (or whatever port Vite prints) so Cast controls work.
+3. In the Cast dialog, set **LAN media address** to your machine's LAN URL, e.g. `http://192.168.1.50:5173`. Chromecast loads media from that address.
+4. Optional: set `CAST_PUBLIC_ORIGIN=http://192.168.1.50:5173` in the backend env so the dialog can default it.
+
+Alternative: open the LAN HTTP URL directly and tell Chrome to treat it as secure:
+
+```text
+chrome://flags/#unsafely-treat-insecure-origin-as-secure
+```
+
+Add `http://192.168.1.50:5173`, enable the flag, relaunch Chrome.
+
+Keep the sender tab open while a slideshow is playing because the browser controls the timer. The app uses Google's Default Media Receiver. Photos are signed JPEG URLs; videos are Cast-friendly MP4s (transcoded on first play if needed). Custom fade/slide transitions need a custom receiver. iOS Cast is not supported.
+
 ## Prerequisites (OMV host)
 
 - Docker and Docker Compose

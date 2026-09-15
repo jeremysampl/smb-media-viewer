@@ -1,4 +1,5 @@
 import type { BrowseResponse, MediaMetadata, QualityProfile } from '../types';
+import type { CastItem } from '../cast/types';
 
 const API_BASE = '/api';
 
@@ -37,6 +38,93 @@ export async function logout(): Promise<void> {
 
 export async function getMe(): Promise<{ username: string; admin: boolean }> {
   return request('/auth/me');
+}
+
+export async function resolveCastSelection(
+  paths: string[],
+  sessionId?: string,
+): Promise<{ items: CastItem[] }> {
+  return request('/cast/resolve', {
+    method: 'POST',
+    body: JSON.stringify({ paths, ...(sessionId ? { sessionId } : {}) }),
+  });
+}
+
+export async function fetchCastConfig(): Promise<{
+  publicOrigin: string | null;
+  publicOriginFromEnv: boolean;
+  lanAddresses: string[];
+  candidates: string[];
+}> {
+  return request('/cast/config');
+}
+
+export interface CastSessionInfo {
+  id: string;
+  username: string;
+  deviceName: string;
+  mediaOrigin: string;
+  itemCount: number;
+  currentItem: string | null;
+  startedAt: number;
+  lastSeenAt: number;
+  stopRequested: boolean;
+}
+
+export async function createCastSession(input: {
+  deviceName: string;
+  mediaOrigin?: string;
+  itemCount?: number;
+  currentItem?: string | null;
+  sessionId?: string;
+}): Promise<{ session: CastSessionInfo }> {
+  return request('/cast/sessions', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function heartbeatCastSession(
+  sessionId: string,
+  input?: {
+    deviceName?: string;
+    mediaOrigin?: string;
+    itemCount?: number;
+    currentItem?: string | null;
+  },
+): Promise<{ stop: boolean; session?: CastSessionInfo }> {
+  return request(`/cast/sessions/${encodeURIComponent(sessionId)}/heartbeat`, {
+    method: 'POST',
+    body: JSON.stringify(input ?? {}),
+  });
+}
+
+export async function endCastSession(sessionId: string): Promise<void> {
+  await request(`/cast/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function stopAdminCastSessions(input: {
+  ids?: string[];
+  all?: boolean;
+}): Promise<{ ok: boolean; stopped: number; sessions: CastSessionInfo[] }> {
+  return request('/admin/cast/sessions/stop', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function fetchCastVideoStatus(
+  token: string,
+  quality = 'high',
+  prepare = true,
+): Promise<{ state: 'ready' | 'processing' | 'missing'; progress: number | null }> {
+  const params = new URLSearchParams({
+    quality,
+    ...(prepare ? { prepare: '1' } : {}),
+  });
+  return request(`/cast/${encodeURIComponent(token)}/video-status?${params}`);
 }
 
 export interface AdminStatus {
@@ -120,6 +208,17 @@ export interface AdminStatus {
     progress: number | null;
     outcome: 'completed' | 'failed';
     error?: string;
+  }>;
+  castSessions: Array<{
+    id: string;
+    username: string;
+    deviceName: string;
+    mediaOrigin: string;
+    itemCount: number;
+    currentItem: string | null;
+    startedAt: number;
+    lastSeenAt: number;
+    stopRequested: boolean;
   }>;
 }
 

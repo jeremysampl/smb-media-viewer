@@ -26,12 +26,13 @@ import { EntryContextMenu, type ContextMenuState } from './EntryContextMenu';
 import { UserMenu } from './UserMenu';
 import { formatDuration, formatEntryMeta } from './formatters';
 import { SORT_OPTIONS, sortEntries } from './sortEntries';
-import { Button, ChevronDownIcon, CloseIcon } from '../ui';
+import { Button, CastIcon, ChevronDownIcon, CloseIcon, IconButton, Modal } from '../ui';
 import {
   gapForColumns,
   paddingForColumns,
   useMobileGridColumns,
 } from './useMobileGridColumns';
+import { useCast } from '../cast/CastContext';
 
 interface BrowserPageProps {
   onLogout: () => Promise<void>;
@@ -85,6 +86,7 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
   const [typeFilterBusy, setTypeFilterBusy] = useState(false);
   const [sortBusy, setSortBusy] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
+  const cast = useCast();
 
   const longPressTimerRef = useRef<number | null>(null);
   const longPressOriginRef = useRef<{ x: number; y: number } | null>(null);
@@ -174,14 +176,9 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
 
   useEffect(() => {
     if (!controlsOpen) return undefined;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setControlsOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      window.removeEventListener('keydown', onKey);
       document.body.style.overflow = previous;
     };
   }, [controlsOpen]);
@@ -388,6 +385,16 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
       return;
     }
 
+    if (
+      cast.connected
+      && cast.mode === 'manual'
+      && (entry.type === 'image' || entry.type === 'video')
+    ) {
+      void cast.castManualSelection(
+        mediaEntries.map((item) => item.path),
+        entry.path,
+      );
+    }
     const index = mediaEntries.findIndex((item) => item.path === entry.path);
     setGalleryIndex(index >= 0 ? index : 0);
     setGalleryOpen(true);
@@ -481,7 +488,7 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
     <div
       className={`browser-page${selectMode ? ' selecting' : ''}${
         showSelectionChrome ? ' has-selection-dock' : ''
-      }`}
+      }${cast.connected ? ' has-cast-bar' : ''}`}
     >
       <header className="top-bar">
         <div className="top-bar-brand">
@@ -498,42 +505,79 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
             <h1>Media Library</h1>
           </div>
         </div>
-        <UserMenu username={username} onLogout={onLogout} isAdmin={isAdmin} />
+        <div className="top-bar-actions">
+          {!isMobile ? (
+            <IconButton
+              label={cast.connected ? 'Add to Cast' : 'Cast media'}
+              disabled={!cast.ready}
+              title={
+                cast.ready
+                  ? (cast.connected ? 'Add to Cast' : 'Cast media')
+                  : (cast.unavailableReason ?? 'Google Cast is not available')
+              }
+              onClick={() => void cast.openSetup({
+                paths: currentPath ? [currentPath] : [],
+                append: cast.connected,
+              })}
+            >
+              <CastIcon />
+            </IconButton>
+          ) : null}
+          <UserMenu username={username} onLogout={onLogout} isAdmin={isAdmin} />
+        </div>
       </header>
 
       <div className="browser-nav">
         <Breadcrumbs path={currentPath} onNavigate={navigateToPath} />
 
         {isMobile ? (
-          <button
-            type="button"
-            className="browser-options-btn"
-            aria-haspopup="dialog"
-            aria-expanded={controlsOpen}
-            onClick={() => setControlsOpen(true)}
-          >
-            <span className="browser-options-btn-icon" aria-hidden>
-              <svg viewBox="0 0 24 24" width="18" height="18">
-                <path
-                  fill="currentColor"
-                  d="M4 6.75h16v1.5H4v-1.5Zm2.5 4.5h11v1.5h-11v-1.5Zm2.5 4.5h6v1.5h-6v-1.5Z"
-                />
-              </svg>
-            </span>
-            <span className="browser-options-btn-copy">
-              <span className="browser-options-btn-title">Library options</span>
-              <span className="browser-options-btn-meta">
-                {SORT_OPTIONS.find((option) => option.id === sort)?.label ?? sort}
-                {' · '}
-                {fileTypeFilterLabel(fileTypeFilter)}
-                {' · '}
-                {profiles.find((profile) => profile.id === quality)?.label ?? quality}
+          <div className="browser-nav-mobile-tools">
+            <button
+              type="button"
+              className="browser-options-btn"
+              aria-haspopup="dialog"
+              aria-expanded={controlsOpen}
+              onClick={() => setControlsOpen(true)}
+            >
+              <span className="browser-options-btn-icon" aria-hidden>
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                  <path
+                    fill="currentColor"
+                    d="M4 6.75h16v1.5H4v-1.5Zm2.5 4.5h11v1.5h-11v-1.5Zm2.5 4.5h6v1.5h-6v-1.5Z"
+                  />
+                </svg>
               </span>
-            </span>
-            <span className="browser-options-btn-chevron" aria-hidden>
-              <ChevronDownIcon size={16} />
-            </span>
-          </button>
+              <span className="browser-options-btn-copy">
+                <span className="browser-options-btn-title">Library options</span>
+                <span className="browser-options-btn-meta">
+                  {SORT_OPTIONS.find((option) => option.id === sort)?.label ?? sort}
+                  {' · '}
+                  {fileTypeFilterLabel(fileTypeFilter)}
+                  {' · '}
+                  {profiles.find((profile) => profile.id === quality)?.label ?? quality}
+                </span>
+              </span>
+              <span className="browser-options-btn-chevron" aria-hidden>
+                <ChevronDownIcon size={16} />
+              </span>
+            </button>
+            <IconButton
+              label={cast.connected ? 'Add to Cast' : 'Cast media'}
+              className="browser-cast-btn"
+              disabled={!cast.ready}
+              title={
+                cast.ready
+                  ? (cast.connected ? 'Add to Cast' : 'Cast media')
+                  : (cast.unavailableReason ?? 'Google Cast is not available')
+              }
+              onClick={() => void cast.openSetup({
+                paths: currentPath ? [currentPath] : [],
+                append: cast.connected,
+              })}
+            >
+              <CastIcon />
+            </IconButton>
+          </div>
         ) : (
           <div className="toolbar-group" role="group" aria-label="Library controls">
             <SortSelector sort={sort} onChange={handleSortChange} busy={sortBusy} />
@@ -555,22 +599,17 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
         )}
       </div>
 
-      {isMobile && controlsOpen ? (
-        <div
-          className="modal-backdrop browser-controls-backdrop"
-          role="presentation"
-          onClick={() => setControlsOpen(false)}
-        >
-          <div
-            className="modal-card browser-controls-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="browser-controls-title"
-            onClick={(event) => event.stopPropagation()}
-          >
+      <Modal
+        open={isMobile && controlsOpen}
+        title="Library options"
+        onClose={() => setControlsOpen(false)}
+        className="browser-controls-sheet"
+        backdropClassName="browser-controls-backdrop"
+        header={(titleId) => (
+          <>
             <div className="browser-controls-sheet-handle" aria-hidden />
             <div className="browser-controls-sheet-header">
-              <h2 id="browser-controls-title">Library options</h2>
+              <h2 id={titleId}>Library options</h2>
               <button
                 type="button"
                 className="browser-controls-close"
@@ -580,37 +619,38 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
                 <CloseIcon size={16} />
               </button>
             </div>
-            <div className="toolbar-group toolbar-group-sheet" role="group" aria-label="Library controls">
-              <SortSelector
-                sort={sort}
-                onChange={handleSortChange}
-                busy={sortBusy}
-                layout="stack"
-              />
-              <FileTypeSelector
-                value={fileTypeFilter}
-                onChange={handleFileTypeFilterChange}
-                busy={typeFilterBusy}
-                layout="stack"
-              />
-              <ResolutionSelector
-                quality={quality}
-                profiles={profiles}
-                onChange={setQuality}
-                layout="stack"
-              />
-              <GridDetailsToggle
-                enabled={showGridDetails}
-                onChange={setShowGridDetails}
-                layout="stack"
-              />
-            </div>
-            <Button className="browser-controls-done" onClick={() => setControlsOpen(false)}>
-              Done
-            </Button>
-          </div>
+          </>
+        )}
+      >
+        <div className="toolbar-group toolbar-group-sheet" role="group" aria-label="Library controls">
+          <SortSelector
+            sort={sort}
+            onChange={handleSortChange}
+            busy={sortBusy}
+            layout="stack"
+          />
+          <FileTypeSelector
+            value={fileTypeFilter}
+            onChange={handleFileTypeFilterChange}
+            busy={typeFilterBusy}
+            layout="stack"
+          />
+          <ResolutionSelector
+            quality={quality}
+            profiles={profiles}
+            onChange={setQuality}
+            layout="stack"
+          />
+          <GridDetailsToggle
+            enabled={showGridDetails}
+            onChange={setShowGridDetails}
+            layout="stack"
+          />
         </div>
-      ) : null}
+        <Button className="browser-controls-done" onClick={() => setControlsOpen(false)}>
+          Done
+        </Button>
+      </Modal>
 
       {loading ? <p className="status">Loading...</p> : null}
       {error ? <p className="error">{error}</p> : null}
@@ -772,6 +812,20 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
             <button
               type="button"
               className="selection-dock-action"
+              disabled={selectedPaths.size === 0 || !cast.ready}
+              onClick={() => void cast.openSetup({
+                paths: [...selectedPaths],
+                append: cast.connected,
+              })}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M3 18v3h3a3 3 0 0 0-3-3Zm0-4v2a5 5 0 0 1 5 5h2a7 7 0 0 0-7-7Zm0-4v2c5 0 9 4 9 9h2c0-6.1-4.9-11-11-11Zm3-5v2h12v10h-2v2h4V5H6Z" />
+              </svg>
+              <span>{cast.connected ? 'Add to Cast' : 'Cast'}</span>
+            </button>
+            <button
+              type="button"
+              className="selection-dock-action"
               disabled={selectedPaths.size === 0}
               onClick={() => openDownload([...selectedPaths])}
             >
@@ -804,6 +858,15 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
           onView={() => viewEntry(contextMenu.entry)}
           onDownloadOne={() => openDownload([contextMenu.entry.path])}
           onDownloadSelected={() => openDownload([...selectedPaths])}
+          onCastOne={() => void cast.openSetup({
+            paths: [contextMenu.entry.path],
+            append: cast.connected,
+          })}
+          onCastSelected={() => void cast.openSetup({
+            paths: [...selectedPaths],
+            append: cast.connected,
+          })}
+          castConnected={cast.connected}
         />
       ) : null}
 
@@ -812,6 +875,15 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
         initialIndex={galleryIndex}
         open={galleryOpen}
         onClose={() => setGalleryOpen(false)}
+        onIndexChange={(nextIndex) => {
+          if (!cast.connected || cast.mode !== 'manual') return;
+          const entry = mediaEntries[nextIndex];
+          if (entry?.type !== 'image' && entry?.type !== 'video') return;
+          void cast.castManualSelection(
+            mediaEntries.map((item) => item.path),
+            entry.path,
+          );
+        }}
       />
 
       <FileViewerHost

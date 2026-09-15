@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { getIsMobileUi } from '../hooks/useIsMobile';
-import type { SelectFieldLayout } from '../ui';
+import { Toggle, type SelectFieldLayout } from '../ui';
 
 const STORAGE_KEY = 'smb-grid-show-details';
 
@@ -41,18 +41,12 @@ export function GridDetailsToggle({
   return (
     <label className={`select-field select-field--${layout} details-toggle`}>
       <span className="select-field__label">Details</span>
-      <span className="slider-toggle">
-        <input
-          type="checkbox"
-          className="slider-toggle-input"
-          checked={enabled}
-          onChange={(event) => onChange(event.target.checked)}
-          aria-label="Show file details in grid"
-        />
-        <span className="slider-toggle-track" aria-hidden>
-          <span className="slider-toggle-thumb" />
-        </span>
-      </span>
+      <Toggle
+        label="Show file details in grid"
+        hideLabel
+        checked={enabled}
+        onChange={onChange}
+      />
     </label>
   );
 }
