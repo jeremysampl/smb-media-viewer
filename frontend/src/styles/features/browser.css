@@ -938,6 +938,18 @@ button.breadcrumb-chip:focus-visible,
   box-shadow: 0 0 0 1px rgba(126, 164, 255, 0.35);
 }
 
+.browser-page.is-drag-selecting,
+.browser-page.is-drag-selecting .file-grid-mobile,
+.browser-page.is-drag-selecting .file-card {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.browser-page.is-drag-selecting {
+  overscroll-behavior: none;
+}
+
 .selection-check {
   position: absolute;
   top: 0.55rem;

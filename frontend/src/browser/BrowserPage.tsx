@@ -42,6 +42,10 @@ interface BrowserPageProps {
 
 const LONG_PRESS_MS = 480;
 const LONG_PRESS_MOVE_PX = 12;
+/** Viewport edge zone that triggers auto-scroll while drag-selecting. */
+const DRAG_SELECT_EDGE_PX = 72;
+/** Max pixels scrolled per animation frame at the extreme edge. */
+const DRAG_SELECT_MAX_SCROLL_PX = 36;
 
 function defaultZipNameForPath(browsePath: string): string {
   const segments = browsePath.split('/').filter(Boolean);
@@ -89,10 +93,28 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
   const cast = useCast();
 
   const longPressTimerRef = useRef<number | null>(null);
-  const longPressOriginRef = useRef<{ x: number; y: number } | null>(null);
-  const longPressPathRef = useRef<string | null>(null);
-  /** Ignore the click that follows a long-press on that card. */
+  /** Ignore the click that follows a long-press / drag-select on that card. */
   const suppressClickPathRef = useRef<string | null>(null);
+  /** Anchor path for shift-click range selection (Explorer-style). */
+  const selectionAnchorRef = useRef<string | null>(null);
+  const selectModeRef = useRef(selectMode);
+  const selectedPathsRef = useRef(selectedPaths);
+  const sortedEntriesRef = useRef<BrowseEntry[]>([]);
+  const dragSelectRef = useRef<{
+    pointerId: number;
+    mode: 'add' | 'remove';
+    anchorPath: string;
+    /** Selection snapshot when the gesture began. */
+    baseline: Set<string>;
+    endPath: string;
+  } | null>(null);
+  const dragPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const autoScrollRafRef = useRef<number | null>(null);
+  const dragSelectCleanupRef = useRef<(() => void) | null>(null);
+  const [dragSelecting, setDragSelecting] = useState(false);
+
+  selectModeRef.current = selectMode;
+  selectedPathsRef.current = selectedPaths;
 
   function navigateToPath(path: string) {
     navigate(browsePathToUrl(path));
@@ -110,16 +132,34 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
     window.scrollTo({ top: 0, behavior: 'auto' });
   }
 
-  function clearLongPress() {
+  function clearLongPressTimer() {
     if (longPressTimerRef.current !== null) {
       window.clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
-    longPressOriginRef.current = null;
-    longPressPathRef.current = null;
+  }
+
+  function stopAutoScroll() {
+    if (autoScrollRafRef.current !== null) {
+      window.cancelAnimationFrame(autoScrollRafRef.current);
+      autoScrollRafRef.current = null;
+    }
+  }
+
+  function endDragSelect() {
+    clearLongPressTimer();
+    stopAutoScroll();
+    dragSelectRef.current = null;
+    dragPointerRef.current = null;
+    setDragSelecting(false);
+    const cleanup = dragSelectCleanupRef.current;
+    dragSelectCleanupRef.current = null;
+    cleanup?.();
   }
 
   function exitSelectMode() {
+    endDragSelect();
+    selectionAnchorRef.current = null;
     setSelectMode(false);
     setSelectedPaths(new Set());
     setDownloadOpen(false);
@@ -130,11 +170,13 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
 
   function beginSelectionWith(path: string) {
     setSelectMode(true);
+    selectionAnchorRef.current = path;
     setSelectedPaths(new Set([path]));
     setContextMenu(null);
   }
 
   function toggleSelected(path: string) {
+    selectionAnchorRef.current = path;
     setSelectedPaths((previous) => {
       const next = new Set(previous);
       if (next.has(path)) next.delete(path);
@@ -143,8 +185,166 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
     });
   }
 
+  function selectRange(fromPath: string, toPath: string) {
+    const paths = sortedEntriesRef.current.map((entry) => entry.path);
+    const from = paths.indexOf(fromPath);
+    const to = paths.indexOf(toPath);
+    if (from < 0 || to < 0) {
+      setSelectMode(true);
+      selectionAnchorRef.current = toPath;
+      setSelectedPaths(new Set([toPath]));
+      return;
+    }
+    const start = Math.min(from, to);
+    const end = Math.max(from, to);
+    setSelectMode(true);
+    setSelectedPaths(() => {
+      const next = new Set<string>();
+      for (let i = start; i <= end; i += 1) next.add(paths[i]!);
+      return next;
+    });
+    // Keep the original anchor so further shift-clicks resize the same range.
+  }
+
   function selectAllVisible() {
-    setSelectedPaths(new Set(sortedEntries.map((entry) => entry.path)));
+    const paths = sortedEntries.map((entry) => entry.path);
+    if (paths[0]) selectionAnchorRef.current = paths[0];
+    setSelectedPaths(new Set(paths));
+  }
+
+  function isSelectionChromeAt(clientX: number, clientY: number): boolean {
+    const hit = document.elementFromPoint(clientX, clientY);
+    if (!(hit instanceof Element)) return false;
+    return Boolean(hit.closest('[data-selection-chrome]'));
+  }
+
+  function pathFromPoint(clientX: number, clientY: number): string | null {
+    if (isSelectionChromeAt(clientX, clientY)) return null;
+    const hit = document.elementFromPoint(clientX, clientY);
+    if (!(hit instanceof Element)) return null;
+    const card = hit.closest('[data-entry-path]');
+    return card?.getAttribute('data-entry-path') ?? null;
+  }
+
+  /** Farthest on-screen card toward the scroll edge (used when finger is on chrome). */
+  function extremeVisiblePath(direction: 'up' | 'down'): string | null {
+    const cards = document.querySelectorAll('[data-entry-path]');
+    const viewTop = 0;
+    const viewBottom = window.innerHeight;
+    let bestPath: string | null = null;
+    let bestY = direction === 'down' ? -Infinity : Infinity;
+
+    for (const card of cards) {
+      if (!(card instanceof HTMLElement)) continue;
+      const path = card.getAttribute('data-entry-path');
+      if (!path) continue;
+      const rect = card.getBoundingClientRect();
+      if (rect.bottom <= viewTop || rect.top >= viewBottom) continue;
+      const y = direction === 'down' ? rect.bottom : rect.top;
+      if (direction === 'down' ? y >= bestY : y <= bestY) {
+        bestY = y;
+        bestPath = path;
+      }
+    }
+    return bestPath;
+  }
+
+  function applyDragRange(endPath: string) {
+    const drag = dragSelectRef.current;
+    if (!drag) return;
+
+    const paths = sortedEntriesRef.current.map((entry) => entry.path);
+    const from = paths.indexOf(drag.anchorPath);
+    const to = paths.indexOf(endPath);
+    if (from < 0 || to < 0) return;
+
+    drag.endPath = endPath;
+    const start = Math.min(from, to);
+    const end = Math.max(from, to);
+    const next = new Set(drag.baseline);
+    for (let i = start; i <= end; i += 1) {
+      const path = paths[i]!;
+      if (drag.mode === 'add') next.add(path);
+      else next.delete(path);
+    }
+    setSelectedPaths(next);
+  }
+
+  function updateDragRangeAtPointer() {
+    const point = dragPointerRef.current;
+    const drag = dragSelectRef.current;
+    if (!point || !drag) return;
+    // Finger over Cast/Download chrome: don't hit-test through it.
+    if (isSelectionChromeAt(point.x, point.y)) return;
+    const path = pathFromPoint(point.x, point.y);
+    if (path && path !== drag.endPath) applyDragRange(path);
+  }
+
+  function startAutoScroll() {
+    stopAutoScroll();
+    const tick = () => {
+      const point = dragPointerRef.current;
+      const drag = dragSelectRef.current;
+      if (!point || !drag) {
+        autoScrollRafRef.current = null;
+        return;
+      }
+
+      const edge = DRAG_SELECT_EDGE_PX;
+      const maxSpeed = DRAG_SELECT_MAX_SCROLL_PX;
+      const y = point.y;
+      const viewHeight = window.innerHeight;
+      let dy = 0;
+
+      if (y < edge) {
+        const intensity = Math.min(1, (edge - y) / edge);
+        dy = -maxSpeed * intensity;
+      } else if (y > viewHeight - edge) {
+        const intensity = Math.min(1, (y - (viewHeight - edge)) / edge);
+        dy = maxSpeed * intensity;
+      }
+
+      if (dy !== 0) {
+        window.scrollBy({ top: dy, left: 0, behavior: 'auto' });
+        if (isSelectionChromeAt(point.x, point.y)) {
+          // Finger is on the dock/chips: keep scrolling and extend the range to
+          // the farthest visible card toward that edge (not the card under chrome).
+          const path = extremeVisiblePath(dy > 0 ? 'down' : 'up');
+          if (path && path !== drag.endPath) applyDragRange(path);
+        } else {
+          updateDragRangeAtPointer();
+        }
+      }
+
+      autoScrollRafRef.current = window.requestAnimationFrame(tick);
+    };
+    autoScrollRafRef.current = window.requestAnimationFrame(tick);
+  }
+
+  function activateDragSelect(path: string, pointerId: number) {
+    const inSelectMode = selectModeRef.current;
+    const baseline = new Set(selectedPathsRef.current);
+    const wasSelected = baseline.has(path);
+    const mode: 'add' | 'remove' = inSelectMode && wasSelected ? 'remove' : 'add';
+
+    if (!inSelectMode) {
+      setSelectMode(true);
+    }
+
+    selectionAnchorRef.current = path;
+    setContextMenu(null);
+    suppressClickPathRef.current = path;
+    dragSelectRef.current = {
+      pointerId,
+      mode,
+      anchorPath: path,
+      baseline,
+      endPath: path,
+    };
+    setDragSelecting(true);
+    applyDragRange(path);
+    startAutoScroll();
+    navigator.vibrate?.(15);
   }
 
   function openDownload(paths: string[]) {
@@ -218,6 +418,7 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
       preferMtime: dateSort && indexingActive,
     });
   }, [entries, fileTypeFilter, sort, indexingActive]);
+  sortedEntriesRef.current = sortedEntries;
 
   const mediaEntries = useMemo(
     () =>
@@ -400,14 +601,25 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
     setGalleryOpen(true);
   }
 
-  function openEntry(entry: BrowseEntry) {
+  function openEntry(entry: BrowseEntry, event?: React.MouseEvent) {
     if (shouldSuppressClick()) return;
 
-    // Long-press may still fire a click on that card; swallow only that one.
+    // Long-press / drag-select may still fire a click on that card; swallow only that one.
     if (suppressClickPathRef.current) {
       const suppressedPath = suppressClickPathRef.current;
       suppressClickPathRef.current = null;
       if (suppressedPath === entry.path) return;
+    }
+
+    if (event?.shiftKey) {
+      event.preventDefault();
+      const anchor = selectionAnchorRef.current;
+      if (anchor) {
+        selectRange(anchor, entry.path);
+      } else {
+        beginSelectionWith(entry.path);
+      }
+      return;
     }
 
     if (selectMode) {
@@ -419,32 +631,74 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
   }
 
   function handleCardPointerDown(entry: BrowseEntry, event: React.PointerEvent) {
-    if (!isMobile || selectMode) return;
+    if (!isMobile) return;
     if (event.pointerType === 'mouse') return;
     if (event.isPrimary === false) return;
+    if (isPinching) return;
 
-    clearLongPress();
-    longPressOriginRef.current = { x: event.clientX, y: event.clientY };
-    longPressPathRef.current = entry.path;
+    // A prior gesture's window listeners may still be around briefly.
+    endDragSelect();
+
+    const path = entry.path;
+    const pointerId = event.pointerId;
+    const originX = event.clientX;
+    const originY = event.clientY;
+    const target = event.currentTarget;
+
+    dragPointerRef.current = { x: originX, y: originY };
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      dragPointerRef.current = { x: moveEvent.clientX, y: moveEvent.clientY };
+
+      if (!dragSelectRef.current) {
+        const dx = moveEvent.clientX - originX;
+        const dy = moveEvent.clientY - originY;
+        if (dx * dx + dy * dy > LONG_PRESS_MOVE_PX * LONG_PRESS_MOVE_PX) {
+          // Finger moved — treat as scroll, cancel the long-press gesture.
+          endDragSelect();
+        }
+        return;
+      }
+
+      if (moveEvent.cancelable) moveEvent.preventDefault();
+      updateDragRangeAtPointer();
+    };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== pointerId) return;
+      endDragSelect();
+    };
+
+    window.addEventListener('pointermove', onPointerMove, { passive: false });
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    dragSelectCleanupRef.current = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      if (target.hasPointerCapture?.(pointerId)) {
+        try {
+          target.releasePointerCapture(pointerId);
+        } catch {
+          // Pointer may already be released.
+        }
+      }
+    };
+
     longPressTimerRef.current = window.setTimeout(() => {
-      const path = longPressPathRef.current;
-      clearLongPress();
-      if (!path) return;
-      suppressClickPathRef.current = path;
-      beginSelectionWith(path);
-      navigator.vibrate?.(15);
+      longPressTimerRef.current = null;
+      activateDragSelect(path, pointerId);
+      try {
+        target.setPointerCapture(pointerId);
+      } catch {
+        // Capture is best-effort; window listeners still drive the gesture.
+      }
+      updateDragRangeAtPointer();
     }, LONG_PRESS_MS);
   }
 
-  function handleCardPointerMove(event: React.PointerEvent) {
-    const origin = longPressOriginRef.current;
-    if (!origin) return;
-    const dx = event.clientX - origin.x;
-    const dy = event.clientY - origin.y;
-    if (dx * dx + dy * dy > LONG_PRESS_MOVE_PX * LONG_PRESS_MOVE_PX) {
-      clearLongPress();
-    }
-  }
+  useEffect(() => () => endDragSelect(), []);
 
   function handleCardContextMenu(entry: BrowseEntry, event: React.MouseEvent) {
     event.preventDefault();
@@ -487,8 +741,10 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
   return (
     <div
       className={`browser-page${selectMode ? ' selecting' : ''}${
-        showSelectionChrome ? ' has-selection-dock' : ''
-      }${cast.connected ? ' has-cast-bar' : ''}`}
+        dragSelecting ? ' is-drag-selecting' : ''
+      }${showSelectionChrome ? ' has-selection-dock' : ''}${
+        cast.connected ? ' has-cast-bar' : ''
+      }`}
     >
       <header className="top-bar">
         <div className="top-bar-brand">
@@ -701,17 +957,14 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
                 className={`file-card ${entry.type}${
                   isMedia && !showGridDetails ? ' compact' : ''
                 }${selected ? ' is-selected' : ''}`}
+                data-entry-path={entry.path}
                 data-media-path={isMedia ? entry.path : undefined}
                 aria-pressed={selectMode ? selected : undefined}
-                onClick={() => openEntry(entry)}
+                onClick={(event) => openEntry(entry, event)}
                 onContextMenu={(event) => handleCardContextMenu(entry, event)}
                 onDragStart={(event) => event.preventDefault()}
                 draggable={false}
                 onPointerDown={(event) => handleCardPointerDown(entry, event)}
-                onPointerMove={handleCardPointerMove}
-                onPointerUp={clearLongPress}
-                onPointerCancel={clearLongPress}
-                onPointerLeave={clearLongPress}
               >
                 {selectMode ? (
                   <span
@@ -772,7 +1025,11 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
 
       {showSelectionChrome ? (
         <>
-          <div className="selection-chip selection-chip-start" role="status">
+          <div
+            className="selection-chip selection-chip-start"
+            role="status"
+            data-selection-chrome
+          >
             <span className="selection-chip-count">{selectedPaths.size}</span>
             <button
               type="button"
@@ -798,6 +1055,7 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
             type="button"
             className="selection-chip selection-chip-end"
             aria-label="Cancel selection"
+            data-selection-chrome
             onClick={exitSelectMode}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -808,7 +1066,12 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
             </svg>
           </button>
 
-          <div className="selection-dock" role="region" aria-label="Selection actions">
+          <div
+            className="selection-dock"
+            role="region"
+            aria-label="Selection actions"
+            data-selection-chrome
+          >
             <button
               type="button"
               className="selection-dock-action"
