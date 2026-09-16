@@ -114,6 +114,7 @@ interface CastItem {
   mediaToken: string;
   contentType: string;
   quality?: string;
+  directPlay?: boolean;
   url: string;
   thumbnailUrl: string;
 }
@@ -371,6 +372,7 @@ router.post('/resolve', authMiddleware, async (req: AuthenticatedRequest, res) =
         mediaToken,
         contentType: direct.ok ? direct.contentType : 'video/mp4',
         quality,
+        directPlay: direct.ok,
         url: `/api/cast/${encoded}/video?quality=${quality}`,
         thumbnailUrl: `/api/cast/${encoded}/poster`,
       });

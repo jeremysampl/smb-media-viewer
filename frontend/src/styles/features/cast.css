@@ -74,6 +74,64 @@
   font-size: 0.9rem;
 }
 
+.cast-banner {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-inset);
+}
+
+.cast-banner p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+.cast-banner__title {
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--color-text-strong);
+}
+
+.cast-banner__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.cast-banner__dismiss {
+  border: 0;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.cast-banner__dismiss:hover {
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cast-banner--info {
+  border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent-fill) 70%, var(--color-surface-inset));
+}
+
+.cast-banner--error {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-fill) 80%, var(--color-surface-inset));
+}
+
+.cast-banner--error .cast-banner__title,
+.cast-banner--error p {
+  color: var(--color-danger);
+}
+
 .cast-toggle-row,
 .cast-queue-heading {
   display: flex;
@@ -249,10 +307,9 @@
   left: 50%;
   bottom: max(var(--space-4), env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   width: min(52rem, calc(100vw - var(--space-7)));
   padding: var(--space-3);
   border: 1px solid var(--color-border-strong);
@@ -262,11 +319,85 @@
   backdrop-filter: blur(18px);
 }
 
+.cast-now-playing__alert {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-fill) 85%, transparent);
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.cast-now-playing__alert button {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+}
+
+.cast-now-playing__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
 .cast-now-playing__media {
   display: flex;
   align-items: center;
   min-width: 0;
+  flex: 1 1 auto;
   gap: var(--space-3);
+}
+
+.cast-now-playing__controls {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--space-3);
+}
+
+.cast-now-playing__timeline {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr) 2.75rem;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 1.35rem;
+}
+
+.cast-now-playing__time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.cast-now-playing__time:last-child {
+  text-align: right;
+}
+
+.cast-now-playing__seek.ui-slider {
+  margin: 0;
+  min-width: 0;
+}
+
+.cast-now-playing__seek.ui-slider input[type='range'] {
+  width: 100%;
+}
+
+.cast-now-playing__seek.ui-slider input[type='range']:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .cast-now-playing__media img,
@@ -294,12 +425,6 @@
 
 .cast-now-playing__media small {
   color: var(--color-text-muted);
-}
-
-.cast-now-playing__controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
 }
 
 .cast-now-playing__transport,
@@ -440,9 +565,12 @@
   }
 
   .cast-now-playing {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
     width: calc(100vw - var(--space-5));
+  }
+
+  .cast-now-playing__row {
+    flex-wrap: wrap;
+    gap: var(--space-3);
   }
 
   .cast-now-playing__controls {
@@ -458,5 +586,9 @@
   .cast-now-playing__actions {
     flex: 0 0 auto;
     margin-left: auto;
+  }
+
+  .cast-now-playing__timeline {
+    grid-template-columns: 2.4rem minmax(0, 1fr) 2.4rem;
   }
 }

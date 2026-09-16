@@ -9,8 +9,16 @@ export interface CastItem {
   contentType: string;
   /** Playback quality for cast media URLs / prepare status. */
   quality?: string;
+  /** When true, Cast can stream the original without waiting on a remux job. */
+  directPlay?: boolean;
   url: string;
   thumbnailUrl: string;
+}
+
+export interface CastVideoProgress {
+  currentTime: number;
+  duration: number;
+  paused: boolean;
 }
 
 export interface CastSettings {

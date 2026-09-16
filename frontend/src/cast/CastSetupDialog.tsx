@@ -36,6 +36,7 @@ interface CastSetupDialogProps {
   connected: boolean;
   loading: boolean;
   error: string;
+  status?: string;
   items: CastItem[];
   settings: CastSettings;
   mediaOrigin: string;
@@ -44,6 +45,7 @@ interface CastSetupDialogProps {
   onMediaOriginChange: (origin: string) => void;
   onSettingsChange: (settings: CastSettings) => void;
   onItemsChange: (items: CastItem[]) => void;
+  onDismissError?: () => void;
   onClose: () => void;
   onApply: () => void;
 }
@@ -325,6 +327,7 @@ export function CastSetupDialog({
   connected,
   loading,
   error,
+  status,
   items,
   settings,
   mediaOrigin,
@@ -333,6 +336,7 @@ export function CastSetupDialog({
   onMediaOriginChange,
   onSettingsChange,
   onItemsChange,
+  onDismissError,
   onClose,
   onApply,
 }: CastSetupDialogProps) {
@@ -445,13 +449,36 @@ export function CastSetupDialog({
             onView={setPreviewIndex}
           />
 
-          {loading ? <p className="cast-status">Preparing photos...</p> : null}
-          {error ? <p className="error">{error}</p> : null}
+          {loading ? (
+            <div className="cast-banner cast-banner--info" role="status">
+              <span className="cast-banner__title">Preparing queue</span>
+              <p>Resolving photos and videos for Cast…</p>
+            </div>
+          ) : null}
+          {status && !loading ? (
+            <div className="cast-banner cast-banner--info" role="status">
+              <span className="cast-banner__title">Working</span>
+              <p>{status}</p>
+            </div>
+          ) : null}
+          {error ? (
+            <div className="cast-banner cast-banner--error" role="alert">
+              <div className="cast-banner__header">
+                <span className="cast-banner__title">Couldn’t cast</span>
+                {onDismissError ? (
+                  <button type="button" className="cast-banner__dismiss" onClick={onDismissError}>
+                    Dismiss
+                  </button>
+                ) : null}
+              </div>
+              <p>{error}</p>
+            </div>
+          ) : null}
         </div>
         <div className="modal-actions">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button
-            disabled={loading || (settings.mode === 'slideshow' && items.length === 0)}
+            disabled={loading || Boolean(status) || (settings.mode === 'slideshow' && items.length === 0)}
             onClick={onApply}
           >
             {connected ? 'Apply' : 'Choose device'}

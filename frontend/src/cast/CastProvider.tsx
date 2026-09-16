@@ -9,7 +9,7 @@ import {
 import { resolveCastSelection, fetchCastVideoStatus, fetchCastConfig, createCastSession, heartbeatCastSession, endCastSession } from '../api/client';
 import { CastNowPlayingBar } from './CastNowPlayingBar';
 import { CastSetupDialog } from './CastSetupDialog';
-import type { CastItem, CastSettings } from './types';
+import type { CastItem, CastSettings, CastVideoProgress } from './types';
 import {
   CastContext,
   type CastContextValue,
@@ -155,16 +155,28 @@ function absoluteMediaUrl(path: string, mediaOrigin: string): string {
   return new URL(path, origin).href;
 }
 
-async function waitForCastVideo(token: string, quality: string): Promise<void> {
+async function waitForCastVideo(
+  token: string,
+  quality: string,
+  onProgress?: (progress: number | null) => void,
+): Promise<void> {
   const started = Date.now();
   let prepare = true;
   while (Date.now() - started < 10 * 60 * 1000) {
     const status = await fetchCastVideoStatus(token, quality, prepare);
     prepare = false;
+    onProgress?.(status.progress);
     if (status.state === 'ready') return;
     await new Promise((resolve) => window.setTimeout(resolve, 700));
   }
   throw new Error('Timed out while preparing the video for Cast.');
+}
+
+function formatPrepareStatus(progress: number | null): string {
+  if (progress != null && progress > 0 && progress < 1) {
+    return `Preparing video for Cast… ${Math.round(progress * 100)}%`;
+  }
+  return 'Preparing video for Cast…';
 }
 
 export function CastProvider({ children }: { children: ReactNode }) {
@@ -190,6 +202,8 @@ export function CastProvider({ children }: { children: ReactNode }) {
   const [mediaOriginCandidates, setMediaOriginCandidates] = useState<string[]>([]);
   const [publicOriginFromEnv, setPublicOriginFromEnv] = useState(false);
   const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
+  const [videoProgress, setVideoProgress] = useState<CastVideoProgress | null>(null);
   const [endsAt, setEndsAt] = useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -202,12 +216,20 @@ export function CastProvider({ children }: { children: ReactNode }) {
   const castSessionIdRef = useRef<string | null>(null);
   const manualRequestRef = useRef(0);
   const mediaListenerRef = useRef<((isAlive: boolean) => void) | null>(null);
+  const remotePlayerRef = useRef<cast.framework.RemotePlayer | null>(null);
+  const remoteControllerRef = useRef<cast.framework.RemotePlayerController | null>(null);
+  const remoteUiUnbindRef = useRef<(() => void) | null>(null);
+  const playingRef = useRef(false);
+  const scrubbingRef = useRef(false);
+  const connectedRef = useRef(false);
   queueRef.current = queue;
   indexRef.current = index;
   settingsRef.current = settings;
   draftQueueRef.current = draftQueue;
   draftSettingsRef.current = draftSettings;
   mediaOriginRef.current = mediaOrigin;
+  playingRef.current = playing;
+  connectedRef.current = connected;
 
   const setMediaOrigin = useCallback((origin: string) => {
     const normalized = normalizeOriginInput(origin) ?? '';
@@ -219,6 +241,46 @@ export function CastProvider({ children }: { children: ReactNode }) {
   const clearMediaListener = useCallback(() => {
     mediaListenerRef.current?.(false);
     mediaListenerRef.current = null;
+    remoteUiUnbindRef.current?.();
+    remoteUiUnbindRef.current = null;
+    setVideoProgress(null);
+  }, []);
+
+  const bindRemotePlayerUi = useCallback(() => {
+    remoteUiUnbindRef.current?.();
+    if (!window.cast?.framework) {
+      remoteUiUnbindRef.current = null;
+      return;
+    }
+    const player = new cast.framework.RemotePlayer();
+    const controller = new cast.framework.RemotePlayerController(player);
+    remotePlayerRef.current = player;
+    remoteControllerRef.current = controller;
+
+    const sync = () => {
+      if (scrubbingRef.current) return;
+      const duration = Number(player.duration);
+      const currentTime = Number(player.currentTime);
+      setVideoProgress({
+        currentTime: Number.isFinite(currentTime) ? Math.max(0, currentTime) : 0,
+        duration: Number.isFinite(duration) && duration > 0 ? duration : 0,
+        paused: Boolean(player.isPaused),
+      });
+      if (
+        player.playerState === chrome.cast.media.PlayerState.PLAYING
+        || player.playerState === chrome.cast.media.PlayerState.BUFFERING
+      ) {
+        setPlaying(true);
+      } else if (player.playerState === chrome.cast.media.PlayerState.PAUSED) {
+        setPlaying(false);
+      }
+    };
+
+    controller.addEventListener(cast.framework.RemotePlayerEventType.ANY_CHANGE, sync);
+    sync();
+    remoteUiUnbindRef.current = () => {
+      controller.removeEventListener(cast.framework.RemotePlayerEventType.ANY_CHANGE, sync);
+    };
   }, []);
 
   const clearBackendSession = useCallback(() => {
@@ -386,20 +448,33 @@ export function CastProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(SESSION_KEY, JSON.stringify({ queue, index }));
   }, [queue, index]);
 
-  const loadItem = useCallback(async (item: CastItem, nextIndex: number) => {
+  const loadItem = useCallback(async (
+    item: CastItem,
+    nextIndex: number,
+    options?: { preservePause?: boolean },
+  ) => {
     const session = window.cast?.framework
       ? cast.framework.CastContext.getInstance().getCurrentSession()
       : null;
     if (!session) throw new Error('No Cast session is connected.');
 
+    const stayPaused = Boolean(options?.preservePause) && !playingRef.current;
+
     clearMediaListener();
-    if (item.kind === 'video') {
-      setError('Preparing video for Cast...');
+    setError('');
+    if (item.kind === 'video' && !item.directPlay) {
+      setStatus('Preparing video for Cast…');
       const quality =
         item.quality
         ?? new URL(item.url, 'http://local').searchParams.get('quality')
         ?? 'full';
-      await waitForCastVideo(item.token, quality);
+      try {
+        await waitForCastVideo(item.token, quality, (progress) => {
+          setStatus(formatPrepareStatus(progress));
+        });
+      } finally {
+        setStatus('');
+      }
     }
 
     const mediaInfo = new chrome.cast.media.MediaInfo(
@@ -415,25 +490,42 @@ export function CastProvider({ children }: { children: ReactNode }) {
     }
 
     const request = new chrome.cast.media.LoadRequest(mediaInfo);
-    request.autoplay = true;
+    request.autoplay = !stayPaused;
     assertCastOk(await session.loadMedia(request), 'Could not load media on the Cast device.');
 
     setIndex(nextIndex);
+    setStatus('');
     setError('');
 
-    if (settingsRef.current.mode !== 'slideshow') {
-      setPlaying(false);
-      setEndsAt(null);
-      return;
-    }
-
     if (item.kind === 'video') {
-      setPlaying(true);
+      bindRemotePlayerUi();
+      if (stayPaused) {
+        const media = session.getMediaSession();
+        if (media) {
+          media.pause(
+            new chrome.cast.media.PauseRequest(),
+            () => undefined,
+            () => undefined,
+          );
+        }
+        setPlaying(false);
+        setVideoProgress((previous) => (
+          previous ? { ...previous, paused: true } : previous
+        ));
+      } else {
+        setPlaying(true);
+      }
       setEndsAt(null);
+
+      if (settingsRef.current.mode !== 'slideshow') {
+        return;
+      }
+
       let active = true;
       let sawPlayback = false;
-      const player = new cast.framework.RemotePlayer();
-      const controller = new cast.framework.RemotePlayerController(player);
+      const player = remotePlayerRef.current ?? new cast.framework.RemotePlayer();
+      const controller = remoteControllerRef.current
+        ?? new cast.framework.RemotePlayerController(player);
       const attachedMedia = { current: session.getMediaSession() as chrome.cast.media.Media | null };
 
       const advanceAfterVideo = () => {
@@ -522,9 +614,21 @@ export function CastProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (settingsRef.current.mode !== 'slideshow') {
+      setPlaying(false);
+      setEndsAt(null);
+      return;
+    }
+
+    if (stayPaused) {
+      setPlaying(false);
+      setEndsAt(null);
+      return;
+    }
+
     setPlaying(true);
     setEndsAt(Date.now() + settingsRef.current.intervalSec * 1000);
-  }, [clearMediaListener]);
+  }, [bindRemotePlayerUi, clearMediaListener]);
 
   const goToRef = useRef<(delta: number) => Promise<void>>(async () => undefined);
 
@@ -542,7 +646,7 @@ export function CastProvider({ children }: { children: ReactNode }) {
     }
     if (next < 0) next = settingsRef.current.repeat ? items.length - 1 : 0;
     try {
-      await loadItem(items[next], next);
+      await loadItem(items[next], next, { preservePause: true });
     } catch (loadError) {
       setError(castErrorMessage(loadError, 'Could not show media'));
       setPlaying(false);
@@ -601,6 +705,7 @@ export function CastProvider({ children }: { children: ReactNode }) {
 
   const openSetup = useCallback(async ({ paths = [], append = false }: OpenSetupOptions = {}) => {
     setError('');
+    setStatus('');
     setDraftQueue(queueRef.current);
     setDraftSettings(settingsRef.current);
     setSetupOpen(true);
@@ -657,6 +762,7 @@ export function CastProvider({ children }: { children: ReactNode }) {
     }
     try {
       const context = cast.framework.CastContext.getInstance();
+      const startingFresh = !connectedRef.current;
       const current = queueRef.current[indexRef.current];
       const nextSettings = draftSettingsRef.current;
       let nextQueue = draftQueueRef.current;
@@ -664,9 +770,16 @@ export function CastProvider({ children }: { children: ReactNode }) {
         setError('Add at least one photo or video to the queue.');
         return;
       }
-      let nextIndex = Math.max(0, nextQueue.findIndex((item) => item.path === current?.path));
+      // New Cast session: always start at the top of the queue.
+      // Re-apply while already connected: keep the current item when possible.
+      let nextIndex = startingFresh
+        ? 0
+        : Math.max(0, nextQueue.findIndex((item) => item.path === current?.path));
       if (nextSettings.shuffle && nextSettings.mode === 'slideshow') {
-        nextQueue = shuffledWithCurrentFirst(nextQueue, current);
+        nextQueue = shuffledWithCurrentFirst(
+          nextQueue,
+          startingFresh ? undefined : current,
+        );
         nextIndex = 0;
       }
       settingsRef.current = nextSettings;
@@ -701,12 +814,15 @@ export function CastProvider({ children }: { children: ReactNode }) {
       setQueue(nextQueue);
       setIndex(nextIndex);
       assertCastOk(await session.setVolume(nextSettings.volume), 'Could not set Cast volume.');
-      await loadItem(nextQueue[nextIndex], nextIndex);
       setConnected(true);
       setDeviceName(friendlyName);
       setMuted(session.isMute());
       setSetupOpen(false);
+      setError('');
+      setStatus('');
+      await loadItem(nextQueue[nextIndex], nextIndex);
     } catch (applyError) {
+      setStatus('');
       setError(castErrorMessage(applyError, 'Could not start casting'));
     }
   }, [ensureBackendSession, loadItem, syncSession, unavailableReason]);
@@ -734,7 +850,7 @@ export function CastProvider({ children }: { children: ReactNode }) {
       indexRef.current = nextIndex;
       setSettings(nextSettings);
       setQueue(resolved.items);
-      await loadItem(item, nextIndex);
+      await loadItem(item, nextIndex, { preservePause: true });
     } catch (manualError) {
       if (manualRequestRef.current !== requestId) return;
       setError(castErrorMessage(manualError, 'Could not show media'));
@@ -749,10 +865,66 @@ export function CastProvider({ children }: { children: ReactNode }) {
     setEndsAt(null);
     setDeviceName('');
     setMuted(false);
+    setStatus('');
+    setError('');
+    setVideoProgress(null);
+    setIndex(0);
+    indexRef.current = 0;
     if (window.cast?.framework) {
       cast.framework.CastContext.getInstance().endCurrentSession(true);
     }
   }, [clearBackendSession, clearMediaListener]);
+
+  const seekVideo = useCallback((timeSeconds: number) => {
+    const player = remotePlayerRef.current;
+    const controller = remoteControllerRef.current;
+    if (!player || !controller || !player.canSeek) return;
+    player.currentTime = Math.max(0, timeSeconds);
+    controller.seek();
+    setVideoProgress((previous) => (
+      previous
+        ? { ...previous, currentTime: Math.max(0, timeSeconds), paused: previous.paused }
+        : previous
+    ));
+  }, []);
+
+  const scrubStart = useCallback(() => {
+    scrubbingRef.current = true;
+    const player = remotePlayerRef.current;
+    const controller = remoteControllerRef.current;
+    if (!player || !controller || player.isPaused) return;
+    controller.playOrPause();
+    setPlaying(false);
+    setVideoProgress((previous) => (
+      previous ? { ...previous, paused: true } : previous
+    ));
+  }, []);
+
+  const scrubEnd = useCallback((resume: boolean) => {
+    scrubbingRef.current = false;
+    if (!resume) return;
+    const player = remotePlayerRef.current;
+    const controller = remoteControllerRef.current;
+    if (!player || !controller || !player.isPaused) return;
+    controller.playOrPause();
+    setPlaying(true);
+    setVideoProgress((previous) => (
+      previous ? { ...previous, paused: false } : previous
+    ));
+  }, []);
+
+  const togglePlayback = useCallback(() => {
+    const current = queueRef.current[indexRef.current];
+    if (current?.kind === 'video') {
+      remoteControllerRef.current?.playOrPause();
+      return;
+    }
+    setPlaying((value) => {
+      const next = !value;
+      setEndsAt(next ? Date.now() + settingsRef.current.intervalSec * 1000 : null);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!connected) return undefined;
@@ -820,6 +992,7 @@ export function CastProvider({ children }: { children: ReactNode }) {
         connected={connected}
         loading={setupLoading}
         error={error}
+        status={status}
         items={draftQueue}
         settings={draftSettings}
         mediaOrigin={mediaOrigin}
@@ -828,7 +1001,11 @@ export function CastProvider({ children }: { children: ReactNode }) {
         onMediaOriginChange={setMediaOrigin}
         onSettingsChange={setDraftSettings}
         onItemsChange={setDraftQueue}
-        onClose={() => setSetupOpen(false)}
+        onDismissError={() => setError('')}
+        onClose={() => {
+          setSetupOpen(false);
+          setError('');
+        }}
         onApply={() => void apply()}
       />
       {connected ? (
@@ -838,33 +1015,23 @@ export function CastProvider({ children }: { children: ReactNode }) {
           mode={settings.mode}
           playing={playing}
           secondsLeft={secondsLeft}
+          intervalSec={settings.intervalSec}
+          status={status}
+          error={setupOpen ? '' : error}
           volume={settings.volume}
           muted={muted}
+          videoProgress={currentItem?.kind === 'video' ? videoProgress : null}
           onVolumeChange={setLiveVolume}
           onToggleMute={toggleMute}
           onPrevious={() => void goTo(-1)}
-          onTogglePlaying={() => {
-            if (currentItem?.kind === 'video') {
-              const media = window.cast?.framework
-                ? cast.framework.CastContext.getInstance().getCurrentSession()?.getMediaSession()
-                : null;
-              if (!media) return;
-              if (playing) {
-                media.pause(new chrome.cast.media.PauseRequest(), () => setPlaying(false), () => undefined);
-              } else {
-                media.play(new chrome.cast.media.PlayRequest(), () => setPlaying(true), () => undefined);
-              }
-              return;
-            }
-            setPlaying((value) => {
-              const next = !value;
-              setEndsAt(next ? Date.now() + settings.intervalSec * 1000 : null);
-              return next;
-            });
-          }}
+          onTogglePlaying={togglePlayback}
+          onSeek={seekVideo}
+          onScrubStart={scrubStart}
+          onScrubEnd={scrubEnd}
           onNext={() => void goTo(1)}
           onExpand={() => void openSetup()}
           onDisconnect={disconnect}
+          onDismissError={() => setError('')}
         />
       ) : null}
     </CastContext.Provider>
