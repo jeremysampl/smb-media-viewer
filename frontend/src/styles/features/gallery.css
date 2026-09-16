@@ -432,6 +432,14 @@
   z-index: 3;
 }
 
+/* Match YARL video framing to the prepare poster (contain-fit, full slide). */
+.yarl__video_container > video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center center;
+}
+
 .mobile-gallery.closing .mobile-gallery-chrome {
   opacity: 0;
   pointer-events: none;

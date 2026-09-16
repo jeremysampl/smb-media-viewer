@@ -310,14 +310,13 @@ export function DesktopLightbox({
             ('entryPath' in slide && typeof slide.entryPath === 'string'
               ? slide.entryPath
               : null) ?? (isImageSlide(slide) ? slide.src : null);
-          const isPreparingVideo =
+          const isPendingVideo =
             currentEntry?.type === 'video' &&
             currentEntry.path === entryPath &&
-            prepareCurrentVideo.known &&
-            prepareCurrentVideo.processing &&
+            !prepareCurrentVideo.ready &&
             isImageSlide(slide);
 
-          if (isPreparingVideo) {
+          if (isPendingVideo) {
             return (
               <div
                 className="gallery-video-prepare-slide"
@@ -326,7 +325,9 @@ export function DesktopLightbox({
                 <GalleryThumbWithLoader
                   src={slide.src}
                   alt={slide.alt ?? currentEntry.name}
-                  showLoader
+                  showLoader={
+                    prepareCurrentVideo.known && prepareCurrentVideo.processing
+                  }
                   progress={prepareCurrentVideo.progress}
                 />
               </div>
