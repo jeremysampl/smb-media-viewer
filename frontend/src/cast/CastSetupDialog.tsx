@@ -28,7 +28,7 @@ import { LazyThumbnail } from '../browser/LazyThumbnail';
 import { MediaGallery } from '../gallery/MediaGallery';
 import { useIsMobile } from '../hooks/useIsMobile';
 import type { BrowseEntry } from '../types';
-import { Button, Modal, Slider, Toggle } from '../ui';
+import { Button, CloseIcon, GripIcon, Modal, Slider, Toggle } from '../ui';
 import type { CastItem, CastSettings } from './types';
 
 interface CastSetupDialogProps {
@@ -94,7 +94,9 @@ function CastQueueItemContent({
         aria-label={`Move ${item.name}`}
         {...dragHandleProps}
       >
-        <span aria-hidden>☰</span>
+        <span aria-hidden>
+          <GripIcon size={16} />
+        </span>
       </button>
       <button
         type="button"
@@ -120,7 +122,7 @@ function CastQueueItemContent({
           aria-label={`Remove ${item.name}`}
           onClick={onRemove}
         >
-          ×
+          <CloseIcon size={16} />
         </button>
       ) : (
         <span className="cast-queue-remove" aria-hidden />

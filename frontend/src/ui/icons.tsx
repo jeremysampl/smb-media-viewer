@@ -41,6 +41,99 @@ export function ChevronDownIcon({ size = 16, ...rest }: IconProps) {
   );
 }
 
+export function ChevronLeftIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <BaseIcon size={size} {...rest}>
+      <path
+        fill="currentColor"
+        d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12l4.58-4.59Z"
+      />
+    </BaseIcon>
+  );
+}
+
+export function ChevronRightIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <BaseIcon size={size} {...rest}>
+      <path
+        fill="currentColor"
+        d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6-6-6Z"
+      />
+    </BaseIcon>
+  );
+}
+
+export function ArrowLeftIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <BaseIcon size={size} {...rest}>
+      <path
+        fill="currentColor"
+        d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2Z"
+      />
+    </BaseIcon>
+  );
+}
+
+export function ArrowRightIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <BaseIcon size={size} {...rest}>
+      <path
+        fill="currentColor"
+        d="M12 4 10.59 5.41 16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8Z"
+      />
+    </BaseIcon>
+  );
+}
+
+export function PlayIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <BaseIcon size={size} {...rest}>
+      <path fill="currentColor" d="M8 5v14l11-7L8 5Z" />
+    </BaseIcon>
+  );
+}
+
+export function PauseIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <BaseIcon size={size} {...rest}>
+      <path fill="currentColor" d="M6 5h4v14H6V5Zm8 0h4v14h-4V5Z" />
+    </BaseIcon>
+  );
+}
+
+export function CheckIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <BaseIcon size={size} {...rest}>
+      <path
+        fill="currentColor"
+        d="M9.55 17.6 4.9 12.95l1.4-1.4 3.25 3.25 7.15-7.15 1.4 1.4L9.55 17.6Z"
+      />
+    </BaseIcon>
+  );
+}
+
+export function GripIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <BaseIcon size={size} {...rest}>
+      <path
+        fill="currentColor"
+        d="M4 7h16v2H4V7Zm0 4h16v2H4v-2Zm0 4h16v2H4v-2Z"
+      />
+    </BaseIcon>
+  );
+}
+
+export function FolderIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <BaseIcon size={size} {...rest}>
+      <path
+        fill="currentColor"
+        d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2Z"
+      />
+    </BaseIcon>
+  );
+}
+
 export function PlusIcon({ size = 18, ...rest }: IconProps) {
   return (
     <BaseIcon size={size} {...rest}>

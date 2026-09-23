@@ -26,7 +26,16 @@ import { EntryContextMenu, type ContextMenuState } from './EntryContextMenu';
 import { UserMenu } from './UserMenu';
 import { formatDuration, formatEntryMeta } from './formatters';
 import { SORT_OPTIONS, sortEntries } from './sortEntries';
-import { Button, CastIcon, ChevronDownIcon, CloseIcon, IconButton, Modal } from '../ui';
+import {
+  Button,
+  CastIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  CloseIcon,
+  FolderIcon,
+  IconButton,
+  Modal,
+} from '../ui';
 import {
   gapForColumns,
   paddingForColumns,
@@ -971,13 +980,13 @@ export function BrowserPage({ onLogout, username, isAdmin = false }: BrowserPage
                     className={`selection-check${selected ? ' checked' : ''}`}
                     aria-hidden
                   >
-                    {selected ? '✓' : ''}
+                    {selected ? <CheckIcon size={14} /> : null}
                   </span>
                 ) : null}
                 <div className="thumb-wrap">
                   {entry.type === 'folder' ? (
                     <div className="folder-icon" aria-hidden>
-                      📁
+                      <FolderIcon size={64} />
                     </div>
                   ) : entry.type === 'file' ? (
                     <FileThumb

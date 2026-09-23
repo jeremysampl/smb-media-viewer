@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile';
-import { IconButton, SettingsIcon, Slider, StopIcon } from '../ui';
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  IconButton,
+  PauseIcon,
+  PlayIcon,
+  SettingsIcon,
+  Slider,
+  StopIcon,
+} from '../ui';
 import type { CastItem, CastMode, CastVideoProgress } from './types';
 
 interface CastNowPlayingBarProps {
@@ -220,7 +229,7 @@ export function CastNowPlayingBar({
         <div className="cast-now-playing__controls">
           <div className="cast-now-playing__transport">
             <button type="button" aria-label="Previous" onClick={onPrevious}>
-              ‹
+              <ChevronLeftIcon size={20} />
             </button>
             {isVideo || mode === 'slideshow' ? (
               <button
@@ -228,11 +237,11 @@ export function CastNowPlayingBar({
                 aria-label={paused ? 'Play' : 'Pause'}
                 onClick={onTogglePlaying}
               >
-                {paused ? '▶' : 'Ⅱ'}
+                {paused ? <PlayIcon size={18} /> : <PauseIcon size={18} />}
               </button>
             ) : null}
             <button type="button" aria-label="Next" onClick={onNext}>
-              ›
+              <ChevronRightIcon size={20} />
             </button>
             <CastVolumeControl
               volume={volume}

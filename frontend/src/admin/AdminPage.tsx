@@ -3,7 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { getAdminStatus, type AdminStatus } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { UserMenu } from '../browser/UserMenu';
-import { Button } from '../ui';
+import { ArrowLeftIcon, ArrowRightIcon, Button } from '../ui';
 import { CachePanel } from './CachePanel';
 import { CastsPanel } from './CastsPanel';
 import { formatBytes, formatDuration } from './format';
@@ -80,7 +80,10 @@ export function AdminPage() {
         <div className="top-bar-brand">
           <div className="top-bar-copy">
             <p className="admin-eyebrow">
-              <Link to="/">← Back to library</Link>
+              <Link to="/">
+                <ArrowLeftIcon size={14} />
+                Back to library
+              </Link>
             </p>
             <h1>Admin Dashboard</h1>
           </div>
@@ -190,7 +193,8 @@ export function AdminPage() {
               <Metric label="Cached files" value={String(cache?.fileCount ?? '—')} />
             </dl>
             <Button variant="link" className="admin-inline-link" onClick={() => setSection('cache')}>
-              Browse cache →
+              Browse cache
+              <ArrowRightIcon size={14} />
             </Button>
           </section>
 
@@ -221,7 +225,8 @@ export function AdminPage() {
               />
             </dl>
             <Button variant="link" className="admin-inline-link" onClick={() => setSection('index')}>
-              Browse index →
+              Browse index
+              <ArrowRightIcon size={14} />
             </Button>
           </section>
         </div>

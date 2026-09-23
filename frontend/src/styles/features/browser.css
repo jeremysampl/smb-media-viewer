@@ -731,8 +731,14 @@ button.breadcrumb-chip:focus-visible,
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: clamp(2.5rem, 42%, 4rem);
+  color: #fbbf24;
   line-height: 1;
+}
+
+.folder-icon svg {
+  width: clamp(2.5rem, 42%, 4rem);
+  height: auto;
+  filter: drop-shadow(0 6px 14px var(--color-shadow));
 }
 
 .file-type-icon {
@@ -962,8 +968,6 @@ button.breadcrumb-chip:focus-visible,
   background: rgba(10, 14, 20, 0.55);
   display: grid;
   place-items: center;
-  font-size: 0.8rem;
-  font-weight: 700;
   color: #fff;
   pointer-events: none;
 }
