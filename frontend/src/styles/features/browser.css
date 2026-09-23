@@ -771,7 +771,7 @@ button.breadcrumb-chip:focus-visible,
 }
 
 .file-type-icon-badge {
-  fill: var(--file-icon-color);
+  fill: color-mix(in srgb, var(--file-icon-color) 72%, #dbe7ff);
 }
 
 .file-type-icon-label {

@@ -180,6 +180,57 @@ function Glyph({ kind }: { kind: FileIconKind }) {
   }
 }
 
+/** Document body top-left in the icon viewBox (matches the body path). */
+const DOC_LEFT = 6;
+const DOC_TOP = 3.5;
+/** Flat top edge ends where the fold begins. */
+const DOC_FOLD_X = 20.25;
+/** Half of `.file-type-icon-body` stroke-width; covers the rim so the badge is flush. */
+const BODY_STROKE_OUTSET = 1.35 / 2;
+/** Fixed badge box: flush top/left, extends to the fold, consistent bottom/right. */
+const BADGE_WIDTH = DOC_FOLD_X - DOC_LEFT + BODY_STROKE_OUTSET;
+const BADGE_HEIGHT = 7.13;
+const BADGE_PAD_X = 1.2;
+const BADGE_PAD_Y = 0.8;
+const BADGE_INNER_RADIUS = 0;
+/** Approximate advance width for bold condensed caps. */
+const CHAR_WIDTH_EM = 0.58;
+
+function badgeLayout(label: string) {
+  const len = Math.max(label.length, 1);
+  const x = DOC_LEFT - BODY_STROKE_OUTSET;
+  const y = DOC_TOP - BODY_STROKE_OUTSET;
+
+  const innerW = BADGE_WIDTH - BADGE_PAD_X * 2;
+  const innerH = BADGE_HEIGHT - BADGE_PAD_Y * 2 - BODY_STROKE_OUTSET;
+  // Fit height first, then shrink so the natural glyph width stays inside the pad.
+  const fontSize = Math.min(innerH, innerW / (len * CHAR_WIDTH_EM));
+
+  return {
+    x,
+    y,
+    width: BADGE_WIDTH,
+    height: BADGE_HEIGHT,
+    fontSize,
+    textX: x + BADGE_WIDTH / 2,
+    // Optical center within the visible badge (below the stroke-cover strip).
+    textY: y + BODY_STROKE_OUTSET + (BADGE_HEIGHT - BODY_STROKE_OUTSET) * 0.35,
+  };
+}
+
+/** Square on the document edges; rounded only on the inner bottom-right. */
+function badgePath(x: number, y: number, w: number, h: number, r: number): string {
+  const radius = Math.min(r, w / 2, h / 2);
+  return [
+    `M${x} ${y}`,
+    `h${w}`,
+    `v${h - radius}`,
+    `a${radius} ${radius} 0 0 1 ${-radius} ${radius}`,
+    `H${x}`,
+    'z',
+  ].join('');
+}
+
 interface FileTypeIconProps {
   /** Path or filename for classification */
   filename?: string;
@@ -190,7 +241,7 @@ interface FileTypeIconProps {
 
 export function FileTypeIcon({ filename, format, className }: FileTypeIconProps) {
   const style = styleForFile(filename || format || '', format);
-  const labelSize = style.label.length > 3 ? 6.2 : 7.2;
+  const badge = badgeLayout(style.label);
 
   return (
     <div
@@ -207,20 +258,17 @@ export function FileTypeIcon({ filename, format, className }: FileTypeIconProps)
         />
         <path className="file-type-icon-fold" d="M19.2 2.5V8a1.3 1.3 0 0 0 1.3 1.3H26" />
         <Glyph kind={style.kind} />
-        <rect
+        <path
           className="file-type-icon-badge"
-          x="5"
-          y="4.2"
-          width="14.5"
-          height="7.2"
-          rx="1.4"
+          d={badgePath(badge.x, badge.y, badge.width, badge.height, BADGE_INNER_RADIUS)}
         />
         <text
           className="file-type-icon-label"
-          x="12.25"
-          y="9.35"
+          x={badge.textX}
+          y={badge.textY}
           textAnchor="middle"
-          fontSize={labelSize}
+          dominantBaseline="central"
+          fontSize={badge.fontSize}
           fontWeight="700"
           fontFamily="ui-sans-serif, system-ui, sans-serif"
         >
