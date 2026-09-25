@@ -1,0 +1,117 @@
+* {
+  box-sizing: border-box;
+}
+
+/* Kill the gray flash on tap for controls (buttons also set this in buttons.css). */
+a,
+[role='button'],
+[role='menuitem'],
+summary,
+label,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top, var(--color-glow), transparent 35%),
+    var(--color-bg);
+}
+
+.login-page,
+.browser-page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6) var(--space-9);
+}
+
+.login-card {
+  max-width: 420px;
+  margin: 8vh auto 0;
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-8);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  box-shadow: var(--shadow-lg);
+}
+
+.login-card h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.subtitle,
+.status {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-danger);
+  margin: 0;
+}
+
+.badge {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  background: rgba(0, 0, 0, 0.65);
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+}
+
+.meta {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.size {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+/* Phone padding / safe areas. Nav stacks at 720px in browser.css. */
+@media (max-width: 600px), (max-height: 500px) and (orientation: landscape) {
+  .login-page,
+  .browser-page {
+    padding-top: var(--space-5);
+    padding-bottom: var(--space-8);
+    padding-left: max(var(--space-2), env(safe-area-inset-left));
+    padding-right: max(var(--space-2), env(safe-area-inset-right));
+  }
+
+  .top-bar-eyebrow {
+    font-size: 0.66rem;
+  }
+
+  .breadcrumb-chip {
+    max-width: 10rem;
+    padding: var(--space-2) 0.65rem;
+    font-size: 0.82rem;
+  }
+
+  .user-menu-name {
+    max-width: 7.5rem;
+  }
+}

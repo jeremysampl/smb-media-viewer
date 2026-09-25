@@ -1,8 +1,10 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { AdminPage } from './admin/AdminPage';
 import { useAuth } from './auth/AuthContext';
 import { LoginPage } from './auth/LoginPage';
 import { BrowserPage } from './browser/BrowserPage';
 import { QualityPreferenceProvider } from './browser/ResolutionSelector';
+import { CastProvider } from './cast/CastProvider';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { username, loading } = useAuth();
@@ -16,24 +18,34 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { username, logout } = useAuth();
+  const { username, admin, logout } = useAuth();
 
   return (
     <QualityPreferenceProvider>
-      <Routes>
+      <CastProvider>
+        <Routes>
         <Route
           path="/login"
           element={username ? <Navigate to="/" replace /> : <LoginPage />}
         />
         <Route
-          path="/*"
+          path="/admin"
           element={
             <ProtectedRoute>
-              <BrowserPage username={username!} onLogout={logout} />
+              <AdminPage />
             </ProtectedRoute>
           }
         />
-      </Routes>
+        <Route
+          path="/*"
+          element={
+            <ProtectedRoute>
+              <BrowserPage username={username!} onLogout={logout} isAdmin={admin} />
+            </ProtectedRoute>
+          }
+        />
+        </Routes>
+      </CastProvider>
     </QualityPreferenceProvider>
   );
 }

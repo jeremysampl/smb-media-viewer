@@ -79,6 +79,7 @@ function parseRangeHeader(
 export function streamFileWithRange(
   filePath: string,
   rangeHeader: string | undefined,
+  contentType = 'video/mp4',
 ): {
   status: number;
   headers: Record<string, string | number>;
@@ -92,7 +93,7 @@ export function streamFileWithRange(
     return {
       status: 200,
       headers: {
-        'Content-Type': 'video/mp4',
+        'Content-Type': contentType,
         'Content-Length': size,
         'Accept-Ranges': 'bytes',
       },
@@ -105,7 +106,7 @@ export function streamFileWithRange(
   return {
     status: 206,
     headers: {
-      'Content-Type': 'video/mp4',
+      'Content-Type': contentType,
       'Content-Length': chunkSize,
       'Content-Range': `bytes ${start}-${end}/${size}`,
       'Accept-Ranges': 'bytes',

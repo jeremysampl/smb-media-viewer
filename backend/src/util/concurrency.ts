@@ -1,4 +1,4 @@
-/** Limit how many async tasks run at once (shared across callers). */
+/** Shared limit on how many async tasks run at once. */
 export function createSemaphore(limit: number) {
   const max = Math.max(1, Math.floor(limit));
   let active = 0;
@@ -41,7 +41,7 @@ export function createSemaphore(limit: number) {
   };
 }
 
-/** Run async work over items with a fixed concurrency limit. */
+/** Map over items with a fixed concurrency limit. */
 export async function mapWithConcurrency<T, R>(
   items: T[],
   concurrency: number,

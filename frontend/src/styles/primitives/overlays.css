@@ -1,0 +1,127 @@
+/* Modal, snackbar, context menu */
+
+.index-snackbar {
+  position: fixed;
+  left: 50%;
+  bottom: max(var(--space-6), env(safe-area-inset-bottom));
+  z-index: var(--z-snackbar);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  width: min(36rem, calc(100vw - var(--space-7)));
+  max-width: calc(100vw - var(--space-7) - env(safe-area-inset-left) - env(safe-area-inset-right));
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: rgba(24, 32, 46, 0.96);
+  border: 1px solid var(--color-warning-border);
+  box-shadow: 0 16px 40px var(--color-shadow-strong);
+  transform: translateX(-50%);
+  animation: snackbar-in var(--duration-med) var(--ease-out);
+}
+
+.index-snackbar p {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  color: var(--color-warning-text);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.index-snackbar-dismiss {
+  flex-shrink: 0;
+  color: var(--color-warning-muted);
+  border-color: var(--color-border-strong);
+  background: transparent;
+}
+
+.index-snackbar-dismiss:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-warning-text);
+}
+
+.entry-context-menu {
+  position: fixed;
+  z-index: 12000;
+  min-width: 11.5rem;
+  max-width: min(18rem, calc(100vw - var(--space-7)));
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: rgba(18, 26, 38, 0.98);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  display: grid;
+  gap: 0.15rem;
+}
+
+.entry-context-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  padding: 0.55rem 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entry-context-menu button:hover:not(:disabled) {
+  background: var(--color-accent-fill);
+}
+
+.entry-context-menu button:disabled {
+  opacity: 0.45;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 11000;
+  display: grid;
+  place-items: center;
+  padding: max(var(--space-5), env(safe-area-inset-top)) max(var(--space-5), env(safe-area-inset-right))
+    max(var(--space-5), env(safe-area-inset-bottom)) max(var(--space-5), env(safe-area-inset-left));
+  background: var(--color-overlay);
+}
+
+.modal-card {
+  width: min(28rem, 100%);
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.35rem 1.4rem 1.25rem;
+  border-radius: var(--radius-xl);
+  background: rgba(18, 26, 38, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-lg);
+  min-height: 0;
+}
+
+.modal-card h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: var(--space-2);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

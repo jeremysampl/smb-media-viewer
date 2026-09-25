@@ -4,18 +4,24 @@ import { acquireThumbSlot } from './thumbLoadGate';
 interface LazyThumbnailProps {
   src: string;
   alt: string;
-  /** Extra rows to preload above/below the viewport */
+  /** Extra rows to preload above/below the viewport. */
   bufferRows?: number;
-  /** Change this when grid order/layout changes so visibility is rechecked */
+  /** Bump when grid order/layout changes to recheck visibility. */
   layoutKey?: string | number;
+  /** Scroll container for visibility checks (defaults to the viewport). */
+  root?: Element | null;
 }
 
 const DEFAULT_CARD_HEIGHT = 160;
 const MAX_RETRIES = 3;
 
-function isNearViewport(element: HTMLElement, margin: number): boolean {
+function isNearRoot(element: HTMLElement, root: Element | null | undefined, margin: number): boolean {
   const rect = element.getBoundingClientRect();
-  return rect.bottom > -margin && rect.top < window.innerHeight + margin;
+  if (!root) {
+    return rect.bottom > -margin && rect.top < window.innerHeight + margin;
+  }
+  const rootRect = root.getBoundingClientRect();
+  return rect.bottom > rootRect.top - margin && rect.top < rootRect.bottom + margin;
 }
 
 function marginFor(element: HTMLElement, bufferRows: number): number {
@@ -28,6 +34,7 @@ export function LazyThumbnail({
   alt,
   bufferRows = 1,
   layoutKey,
+  root = null,
 }: LazyThumbnailProps) {
   const ref = useRef<HTMLDivElement>(null);
   const retryCountRef = useRef(0);
@@ -58,32 +65,55 @@ export function LazyThumbnail({
     const element = ref.current;
     if (!element) return undefined;
 
+    let frame = 0;
     const update = () => {
-      setInView(isNearViewport(element, marginFor(element, bufferRows)));
+      setInView(isNearRoot(element, root, marginFor(element, bufferRows)));
+    };
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        update();
+      });
     };
 
+    const margin = marginFor(element, bufferRows);
     const observer = new IntersectionObserver(
       ([entry]) => {
+        // Prefer geometry check: IO can miss abs-positioned / transformed moves
+        // inside nested scrollers (virtual lists).
         if (entry.isIntersecting) {
           setInView(true);
           return;
         }
         update();
       },
-      { rootMargin: `${marginFor(element, bufferRows)}px 0px` },
+      {
+        root,
+        rootMargin: `${margin}px 0px`,
+      },
     );
     observer.observe(element);
     update();
 
-    return () => observer.disconnect();
-  }, [bufferRows, layoutKey, src]);
+    const scrollTarget: Element | Window = root ?? window;
+    scrollTarget.addEventListener('scroll', scheduleUpdate, { passive: true });
+    window.addEventListener('resize', scheduleUpdate);
+
+    return () => {
+      observer.disconnect();
+      scrollTarget.removeEventListener('scroll', scheduleUpdate);
+      window.removeEventListener('resize', scheduleUpdate);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [bufferRows, layoutKey, src, root]);
 
   useLayoutEffect(() => {
     if (layoutKey === undefined) return undefined;
 
     const element = ref.current;
     if (element) {
-      setInView(isNearViewport(element, marginFor(element, bufferRows)));
+      setInView(isNearRoot(element, root, marginFor(element, bufferRows)));
     }
 
     let cancelled = false;
@@ -93,7 +123,7 @@ export function LazyThumbnail({
         if (cancelled) return;
         const node = ref.current;
         if (!node) return;
-        setInView(isNearViewport(node, marginFor(node, bufferRows)));
+        setInView(isNearRoot(node, root, marginFor(node, bufferRows)));
       });
     });
 
@@ -102,9 +132,9 @@ export function LazyThumbnail({
       window.cancelAnimationFrame(outerFrame);
       window.cancelAnimationFrame(innerFrame);
     };
-  }, [layoutKey, bufferRows]);
+  }, [layoutKey, bufferRows, root]);
 
-  // Gate in-flight fetches only — release as soon as the image finishes (or cancels).
+  // Hold a slot only while the request is in flight.
   useEffect(() => {
     if (!inView || giveUp || awaitingRetry || loaded) {
       releaseSlot();

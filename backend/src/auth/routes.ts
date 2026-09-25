@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { config } from '../config.js';
+import { isAdminUsername } from './admin.js';
 import { validateSambaCredentials } from './smb.js';
 import { signAuthToken } from './jwt.js';
 import { authMiddleware, type AuthenticatedRequest } from './middleware.js';
@@ -35,7 +36,7 @@ router.post('/login', async (req, res) => {
 
   res.cookie(config.cookieName, token, cookieOptions);
 
-  res.json({ username, token });
+  res.json({ username, admin: isAdminUsername(username), token });
 });
 
 router.post('/logout', (_req, res) => {
@@ -48,7 +49,8 @@ router.post('/logout', (_req, res) => {
 });
 
 router.get('/me', authMiddleware, (req: AuthenticatedRequest, res) => {
-  res.json({ username: req.user!.username });
+  const username = req.user!.username;
+  res.json({ username, admin: isAdminUsername(username) });
 });
 
 export default router;

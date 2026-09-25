@@ -8,8 +8,9 @@ import { config } from '../config.js';
 import { getImageCaptureTime } from '../media/captureTime.js';
 import { getQualityProfile } from '../media/quality.js';
 import { getVideoBrowseInfo } from '../media/videoMetadata.js';
+import { recordFinishedJob } from '../jobs/tracker.js';
 import { createSemaphore } from '../util/concurrency.js';
-import { getIndexDb, getThumbPath, upsertMediaIndexRow } from './db.js';
+import { getIndexDb, getMediaIndexRow, getThumbPath, upsertMediaIndexRow } from './db.js';
 
 export interface IndexJob {
   absolutePath: string;
@@ -18,7 +19,10 @@ export interface IndexJob {
   kind: 'image' | 'video';
 }
 
-/** Caps Sharp/ffmpeg/EXIF work across background + on-demand HTTP paths. */
+/** Bump when capture-time parsing changes so existing rows are refreshed. */
+export const CAPTURE_META_VERSION = 2;
+
+/** Shared limit for background indexing and on-demand thumbs. */
 const indexWork = createSemaphore(config.indexConcurrency);
 
 type QueuedIndexJob = IndexJob & { priority: 'high' | 'low' };
@@ -26,7 +30,10 @@ type QueuedIndexJob = IndexJob & { priority: 'high' | 'low' };
 const queue: QueuedIndexJob[] = [];
 const queuedPaths = new Set<string>();
 const inFlight = new Map<string, Promise<{ filePath: string; contentType: string } | null>>();
+const activeJobs = new Map<string, QueuedIndexJob>();
 let activeWorkers = 0;
+let completedCount = 0;
+let failedCount = 0;
 
 function thumbKeyFor(sourcePath: string, mtimeMs: number, kind: string): string {
   // color-v6: HDR via libplacebo (or CPU tonemap+vibrance); SDR limited→full + light eq
@@ -209,7 +216,7 @@ async function generateVideoPoster(
   const transfer = await probeVideoTransfer(sourcePath);
   const hdr = transfer !== null && HDR_TRANSFERS.has(transfer);
 
-  // Prefer libplacebo for HDR; fall back to CPU tonemap; then SDR.
+  // Try libplacebo for HDR, then CPU tonemap, then SDR.
   const pipelines: PosterPipeline[] = hdr
     ? ['libplacebo', 'cpu-hdr', 'sdr']
     : ['sdr'];
@@ -277,18 +284,13 @@ async function indexOne(
       // generate below
     }
 
-    // Prefer serving an existing thumb immediately for HTTP; metadata can catch up later.
-    // Background jobs always refresh capture/duration.
-    const needsMeta = !options.requireThumb || !thumbReady;
-
-    if (needsMeta) {
-      if (job.kind === 'image') {
-        captureTime = (await getImageCaptureTime(job.absolutePath)) ?? null;
-      } else {
-        const info = await getVideoBrowseInfo(job.absolutePath);
-        captureTime = info.captureTime ?? null;
-        duration = info.duration ?? null;
-      }
+    // Always refresh capture/duration when indexing (parsing can improve over time).
+    if (job.kind === 'image') {
+      captureTime = (await getImageCaptureTime(job.absolutePath)) ?? null;
+    } else {
+      const info = await getVideoBrowseInfo(job.absolutePath);
+      captureTime = info.captureTime ?? null;
+      duration = info.duration ?? null;
     }
 
     if (!thumbReady) {
@@ -304,7 +306,7 @@ async function indexOne(
       }
     }
 
-    if (needsMeta || thumbReady) {
+    if (thumbReady || captureTime || duration != null) {
       upsertMediaIndexRow({
         absolutePath: job.absolutePath,
         mtimeMs: job.mtimeMs,
@@ -313,6 +315,7 @@ async function indexOne(
         thumbKey: thumbReady ? thumbKey : null,
         captureTime,
         duration,
+        captureMetaVersion: CAPTURE_META_VERSION,
       });
     }
 
@@ -345,17 +348,105 @@ function pumpQueue(): void {
     const job = takeNextJob();
     if (!job) return;
     activeWorkers += 1;
+    activeJobs.set(job.absolutePath, job);
+    const startedAt = Date.now();
 
     void indexOne(job, { requireThumb: job.priority === 'high' })
+      .then(() => {
+        completedCount += 1;
+        recordFinishedJob({
+          kind: job.kind === 'image' ? 'image_index' : 'video_index',
+          path: job.absolutePath,
+          size: job.size,
+          priority: job.priority,
+          startedAt,
+          outcome: 'completed',
+        });
+      })
       .catch((error) => {
+        failedCount += 1;
+        const message = error instanceof Error ? error.message : String(error);
         console.error(`[index] Failed for ${job.absolutePath}:`, error);
+        recordFinishedJob({
+          kind: job.kind === 'image' ? 'image_index' : 'video_index',
+          path: job.absolutePath,
+          size: job.size,
+          priority: job.priority,
+          startedAt,
+          outcome: 'failed',
+          error: message,
+        });
       })
       .finally(() => {
+        activeJobs.delete(job.absolutePath);
         queuedPaths.delete(job.absolutePath);
         activeWorkers -= 1;
         pumpQueue();
       });
   }
+}
+
+export interface IndexQueueJobView {
+  path: string;
+  label: string;
+  size: number;
+  kind: 'image' | 'video';
+  priority: 'high' | 'low';
+  status: 'queued' | 'active';
+}
+
+export interface IndexQueueStatus {
+  concurrency: number;
+  activeWorkers: number;
+  queued: number;
+  semaphoreActive: number;
+  semaphorePending: number;
+  completed: number;
+  failed: number;
+  /** Rough progress for the current backlog this session. */
+  progress: number | null;
+  jobs: IndexQueueJobView[];
+}
+
+export function getIndexQueueStatus(): IndexQueueStatus {
+  const active: IndexQueueJobView[] = [...activeJobs.values()].map((job) => ({
+    path: job.absolutePath,
+    label: path.basename(job.absolutePath),
+    size: job.size,
+    kind: job.kind,
+    priority: job.priority,
+    status: 'active' as const,
+  }));
+  const queued: IndexQueueJobView[] = queue.map((job) => ({
+    path: job.absolutePath,
+    label: path.basename(job.absolutePath),
+    size: job.size,
+    kind: job.kind,
+    priority: job.priority,
+    status: 'queued' as const,
+  }));
+
+  const remaining = active.length + queued.length;
+  const total = completedCount + remaining;
+  const progress =
+    remaining > 0 && total > 0
+      ? Math.round((completedCount / total) * 1000) / 1000
+      : remaining === 0 && completedCount > 0
+        ? 1
+        : null;
+
+  return {
+    concurrency: config.indexConcurrency,
+    activeWorkers,
+    queued: queue.length,
+    semaphoreActive: indexWork.active,
+    semaphorePending: indexWork.pending,
+    completed: completedCount,
+    failed: failedCount,
+    progress,
+    // Keep the admin payload small.
+    jobs: [...active, ...queued].slice(0, 80),
+  };
 }
 
 export function enqueueIndexJobs(jobs: IndexJob[]): void {
@@ -367,22 +458,22 @@ export function enqueueIndexJobs(jobs: IndexJob[]): void {
   pumpQueue();
 }
 
-/** Ensure a grid thumb/poster exists (on-demand path for media routes). */
+/** Make sure a grid thumb/poster exists (media routes). */
 export async function ensureIndexAsset(
   absolutePath: string,
   mtimeMs: number,
   size: number,
   kind: 'image' | 'video',
 ): Promise<{ filePath: string; contentType: string }> {
-  const thumbKey = thumbKeyFor(absolutePath, mtimeMs, kind);
-  const thumbPath = getThumbPath(thumbKey);
-
-  // Fast path: existing thumb — no EXIF/ffmpeg, no semaphore slot.
-  try {
-    await fs.access(thumbPath);
-    return { filePath: thumbPath, contentType: 'image/webp' };
-  } catch {
-    // generate below
+  const existing = getMediaIndexRow(absolutePath);
+  if (existing?.mtimeMs === mtimeMs && existing.thumbKey) {
+    const existingThumb = getThumbPath(existing.thumbKey);
+    try {
+      await fs.access(existingThumb);
+      return { filePath: existingThumb, contentType: 'image/webp' };
+    } catch {
+      // regenerate below
+    }
   }
 
   const result = await indexOne(

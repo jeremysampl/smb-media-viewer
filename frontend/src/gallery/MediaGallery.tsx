@@ -8,14 +8,16 @@ interface MediaGalleryProps {
   initialIndex: number;
   open: boolean;
   onClose: () => void;
+  onIndexChange?: (index: number) => void;
+  className?: string;
 }
 
-export function MediaGallery(props: MediaGalleryProps) {
+export function MediaGallery({ className, ...props }: MediaGalleryProps) {
   const isMobile = useIsMobile();
 
   if (isMobile) {
-    return <MobileGallery {...props} />;
+    return <MobileGallery {...props} className={className} />;
   }
 
-  return <DesktopLightbox {...props} />;
+  return <DesktopLightbox {...props} className={className} />;
 }

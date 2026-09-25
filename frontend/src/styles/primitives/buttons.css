@@ -1,0 +1,156 @@
+/*
+ * Button styles. Bare `button` is unstyled; use .btn / .icon-btn
+ * (or a feature class) for appearance.
+ */
+
+button {
+  font: inherit;
+  cursor: pointer;
+  color: inherit;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-h-md);
+  padding: var(--control-pad-y) var(--control-pad-x);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease,
+    opacity var(--duration-fast) ease;
+}
+
+.btn--sm {
+  min-height: var(--control-h-sm);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.86rem;
+}
+
+.btn--md {
+  min-height: var(--control-h-md);
+}
+
+.btn--primary {
+  background: var(--color-accent-gradient);
+  border-color: transparent;
+  color: var(--color-text-strong);
+}
+
+.btn--primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.btn--secondary {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: rgba(26, 36, 52, 0.96);
+  border-color: var(--color-border-accent);
+}
+
+.btn--danger {
+  background: var(--color-danger-fill);
+  border-color: rgba(255, 143, 143, 0.35);
+  color: var(--color-danger);
+}
+
+.btn--danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn--ghost {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: transparent;
+  color: var(--color-text);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn--link {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-accent-soft);
+  font-weight: 500;
+  min-height: 0;
+  padding: 0.2rem 0.35rem;
+}
+
+.btn--link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
+  min-width: var(--control-h-sm);
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-weight: 600;
+  line-height: 0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--duration-fast) ease;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.icon-btn--lg {
+  width: var(--control-h-md);
+  height: var(--control-h-md);
+  min-width: var(--control-h-md);
+}
+
+.icon-btn svg,
+.btn svg,
+button svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Alias for older className="secondary" usages */
+button.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-h-md);
+  padding: var(--control-pad-y) var(--control-pad-x);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  font-weight: 600;
+}

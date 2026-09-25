@@ -8,9 +8,9 @@ import {
 } from '../permissions/resolver.js';
 import { authMiddleware, type AuthenticatedRequest } from '../auth/middleware.js';
 import { createMediaToken } from '../media/tokens.js';
-import { getFormatLabel, isImageFile, isMediaFile, isVideoFile } from '../media/fileTypes.js';
+import { getFormatLabel, isImageFile, isMediaFile, isVideoFile, getViewerKind } from '../media/fileTypes.js';
 import { getMediaIndexRows } from '../index/db.js';
-import { enqueueIndexJobs, type IndexJob } from '../index/indexer.js';
+import { CAPTURE_META_VERSION, enqueueIndexJobs, type IndexJob } from '../index/indexer.js';
 import { mapWithConcurrency } from '../util/concurrency.js';
 import type { BrowseEntry } from '../types.js';
 
@@ -119,20 +119,15 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
     const token = createMediaToken(file.absoluteEntryPath, username);
     const mtimeMs = file.stats.mtimeMs;
     const indexed = indexRows.get(file.absoluteEntryPath);
-    const fresh = indexed && indexed.mtimeMs === mtimeMs;
+    const fresh = Boolean(indexed && indexed.mtimeMs === mtimeMs);
+    const hasThumb = Boolean(fresh && indexed?.thumbKey);
+    const metaCurrent = Boolean(
+      fresh && (indexed?.captureMetaVersion ?? 0) >= CAPTURE_META_VERSION,
+    );
 
-    if (!fresh) {
-      staleJobs.push({
-        absolutePath: file.absoluteEntryPath,
-        mtimeMs,
-        size: file.stats.size,
-        kind: isVideo ? 'video' : 'image',
-      });
-    } else if (
-      !indexed.thumbKey ||
-      (isVideo && !indexed.captureTime) ||
-      (isImage && !indexed.captureTime)
-    ) {
+    // Re-index when missing/stale, thumb missing, or capture parsing version changed.
+    // A null captureTime alone is not "pending"; some files have no date.
+    if (!fresh || !hasThumb || !metaCurrent) {
       staleJobs.push({
         absolutePath: file.absoluteEntryPath,
         mtimeMs,
@@ -147,9 +142,11 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
       type: isVideo ? 'video' : 'image',
       size: file.stats.size,
       mtime: file.stats.mtime.toISOString(),
-      captureTime: fresh ? indexed.captureTime ?? undefined : undefined,
+      captureTime: fresh ? indexed!.captureTime ?? undefined : undefined,
+      // Thumbs ready enough for the grid; meta version refresh can continue quietly.
+      indexed: hasThumb,
       format: getFormatLabel(file.name),
-      duration: fresh ? indexed.duration ?? undefined : undefined,
+      duration: fresh ? indexed!.duration ?? undefined : undefined,
       token,
       thumbnailUrl: isImage
         ? `/api/media/${token}/image?quality=very_low`
@@ -169,6 +166,10 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
 
   for (const file of statedOther) {
     if (!file) continue;
+    const viewer = getViewerKind(file.name);
+    const token = viewer
+      ? createMediaToken(file.absoluteEntryPath, username)
+      : undefined;
     entries.push({
       name: file.name,
       path: file.entryBrowsePath,
@@ -176,6 +177,8 @@ router.get('/browse', async (req: AuthenticatedRequest, res) => {
       size: file.stats.size,
       mtime: file.stats.mtime.toISOString(),
       format: getFormatLabel(file.name),
+      viewer: viewer ?? undefined,
+      token,
     });
   }
 

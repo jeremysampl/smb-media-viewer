@@ -4,7 +4,7 @@
     "target": "es2023",
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
-    "types": ["vite/client"],
+    "types": ["vite/client", "chromecast-caf-sender"],
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 
@@ -15,6 +15,11 @@
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@smb/file-types": ["../backend/src/media/fileTypes.ts"]
+    },
 
     /* Linting */
     "noUnusedLocals": true,
@@ -22,5 +27,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src", "../backend/src/media/fileTypes.ts"]
 }

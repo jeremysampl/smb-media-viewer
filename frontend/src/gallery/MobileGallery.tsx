@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { mediaUrl } from '../api/client';
 import type { BrowseEntry, QualityTier } from '../types';
 import { useQualityPreference } from '../browser/ResolutionSelector';
+import { SelectField } from '../ui';
 import { ChromeRasterImage } from './ChromeRasterImage';
 import { MediaDetailsPanel } from './MediaDetailsPanel';
 import { prefetchMediaMetadata } from './mediaMetadataCache';
@@ -33,6 +34,8 @@ interface MobileGalleryProps {
   initialIndex: number;
   open: boolean;
   onClose: () => void;
+  onIndexChange?: (index: number) => void;
+  className?: string;
 }
 
 const SWIPE_THRESHOLD = 72;
@@ -42,6 +45,8 @@ const TAP_MOVE_LIMIT = 12;
 const SWIPE_ANIM_MS = 450;
 const FLYOUT_ANIM_MS = 380;
 const SLIDE_GAP = 16;
+/** Only mount current ± this many slides (keeps big folders from building a huge track). */
+const SLIDE_WINDOW = 1;
 const DETAILS_SHEET_VH = 0.46;
 const DETAILS_SHEET_LANDSCAPE_VH = 0.4;
 const DETAILS_SHEET_LANDSCAPE_MAX_PX = 340;
@@ -92,21 +97,24 @@ function GalleryQualitySelect({
   onChange: (quality: QualityTier) => void;
 }) {
   return (
-    <label className="mobile-gallery-quality" onClick={(event) => event.stopPropagation()}>
-      <span className="sr-only">Quality</span>
-      <select
+    <div
+      className="mobile-gallery-quality"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <SelectField
+        label="Quality"
         value={quality}
-        aria-label="Quality"
-        onChange={(event) => onChange(event.target.value as QualityTier)}
+        layout="ghost"
         onClick={(event) => event.stopPropagation()}
+        onChange={(value) => onChange(value as QualityTier)}
       >
         {profiles.map((profile) => (
           <option key={profile.id} value={profile.id}>
             {profile.label}
           </option>
         ))}
-      </select>
-    </label>
+      </SelectField>
+    </div>
   );
 }
 
@@ -155,7 +163,7 @@ function buildFlyoutLayer(
   _quality: QualityTier,
 ): FlyoutLayer | null {
   if (!entry.token) return null;
-  // Always morph with a cached still (thumb/poster) via <img> — avoids empty/unload
+  // Morph with a cached thumb/poster <img> so we never animate an empty/unloaded
   // full-res frames and broken <video src=poster> during the open animation.
   const src =
     entry.type === 'video'
@@ -172,7 +180,7 @@ function stageFlyoutRect(
   if (!rect || rect.width <= 0 || rect.height <= 0) {
     return viewportFlyoutRect();
   }
-  // Prefer the object-fit:contain paint box so open ends on the same framing
+  // Use the object-fit:contain paint box so open ends on the same framing
   // the gallery uses (then cover on a matching-aspect frame is a no-op crop).
   const natural = mediaPath ? getThumbnailNaturalSize(mediaPath) : null;
   if (natural) {
@@ -211,7 +219,7 @@ function getActiveImage(stage: HTMLDivElement | null, activeIndex: number) {
 
 function getActiveVideoPoster(stage: HTMLDivElement | null, activeIndex: number) {
   return getActiveSlide(stage, activeIndex)?.querySelector(
-    '.mobile-gallery-video-poster',
+    '.gallery-thumb-overlay-host__img',
   ) as HTMLImageElement | null;
 }
 
@@ -276,6 +284,8 @@ export function MobileGallery({
   initialIndex,
   open,
   onClose,
+  onIndexChange,
+  className = '',
 }: MobileGalleryProps) {
   const { quality, setQuality, profiles } = useQualityPreference();
   const [index, setIndex] = useState(initialIndex);
@@ -294,12 +304,21 @@ export function MobileGallery({
   const [hydratedPaths, setHydratedPaths] = useState<Set<string>>(() => new Set());
 
   const stageRef = useRef<HTMLDivElement>(null);
+  const detailsSheetRef = useRef<HTMLDivElement>(null);
   const touchRef = useRef<TouchState | null>(null);
+  const sheetTouchRef = useRef<{
+    startX: number;
+    startY: number;
+    offsetY: number;
+    dragging: boolean;
+  } | null>(null);
   const pinchRef = useRef<PinchState | null>(null);
   const mediaEntries = useMemo(
     () => entries.filter((entry) => entry.type === 'image' || entry.type === 'video'),
     [entries],
   );
+  const mediaEntriesRef = useRef(mediaEntries);
+  mediaEntriesRef.current = mediaEntries;
 
   const currentEntry = mediaEntries[index];
 
@@ -363,7 +382,7 @@ export function MobileGallery({
 
   const runFlyoutClose = useCallback(
     (fromRect: DOMRect) => {
-      const entry = mediaEntries[indexRef.current];
+      const entry = mediaEntriesRef.current[indexRef.current];
       if (!entry?.token) {
         onClose();
         return;
@@ -375,8 +394,7 @@ export function MobileGallery({
         return;
       }
 
-      // Same cached thumb/poster as open — avoid first-close jank from decoding
-      // a fresh full-quality <img>/<video> mid-animation.
+      // Reuse the same thumb/poster as open to avoid decode jank on first close.
       const closingLayer = buildFlyoutLayer(
         entry,
         rectFromDomRect(fromRect, 0),
@@ -414,7 +432,7 @@ export function MobileGallery({
         setFlyout(null);
       }, FLYOUT_ANIM_MS);
     },
-    [mediaEntries, onClose, quality, resetDetailsSheet, resetImageZoom],
+    [onClose, quality, resetDetailsSheet, resetImageZoom],
   );
 
   const animateClose = useCallback(() => {
@@ -438,11 +456,12 @@ export function MobileGallery({
     const delta = nextIndex - current;
     const carryOffset = offsetX - delta * step;
     setIndex(nextIndex);
+    onIndexChange?.(nextIndex);
     setDragOffset({ x: carryOffset, y: 0 });
     requestAnimationFrame(() => {
       setDragOffset({ x: 0, y: 0 });
     });
-  }, []);
+  }, [onIndexChange]);
 
   const qualityRef = useRef(quality);
   qualityRef.current = quality;
@@ -456,7 +475,7 @@ export function MobileGallery({
 
     updateMetrics();
 
-    const entry = mediaEntries[initialIndex];
+    const entry = mediaEntriesRef.current[initialIndex];
     setIndex(initialIndex);
     setDetailsOpen(false);
     setSheetDragY(0);
@@ -492,7 +511,7 @@ export function MobileGallery({
     let openTimer: number | undefined;
     const raf = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        // Don't measure the underlying <img> — it may still be unloaded (0×0)
+        // Don't measure the underlying <img>; it may still be unloaded (0x0)
         // which made the flyout animate toward a tiny rect (looked like zooming out).
         // Target the contain paint box (via thumb natural size) so cover matches.
         const targetRect = stageFlyoutRect(stageRef.current, entry.path);
@@ -511,17 +530,27 @@ export function MobileGallery({
       cancelAnimationFrame(raf);
       if (openTimer !== undefined) window.clearTimeout(openTimer);
     };
-    // quality intentionally omitted — changing quality must not reset to initialIndex.
-  }, [open, initialIndex, mediaEntries, updateMetrics, resetImageZoom]);
+  }, [open, initialIndex, updateMetrics, resetImageZoom]);
 
   useEffect(() => {
     resetImageZoom();
-    const entry = mediaEntries[index];
-    if (!entry) return;
     setHydratedPaths((previous) => {
-      if (previous.has(entry.path)) return previous;
-      const next = new Set(previous);
-      next.add(entry.path);
+      const next = new Set<string>();
+      for (let offset = -SLIDE_WINDOW; offset <= SLIDE_WINDOW; offset += 1) {
+        const entry = mediaEntries[index + offset];
+        if (!entry) continue;
+        if (offset === 0 || previous.has(entry.path)) next.add(entry.path);
+      }
+      if (next.size === previous.size) {
+        let same = true;
+        for (const path of next) {
+          if (!previous.has(path)) {
+            same = false;
+            break;
+          }
+        }
+        if (same) return previous;
+      }
       return next;
     });
   }, [index, mediaEntries, resetImageZoom]);
@@ -678,6 +707,8 @@ export function MobileGallery({
         event.preventDefault();
         const offsetX = touch.clientX - state.startX;
         const offsetY = touch.clientY - state.startY;
+        state.offsetX = offsetX;
+        state.offsetY = offsetY;
         const zoom = imageZoomRef.current;
         const context = getImageZoomContext(stageRef.current, indexRef.current);
         const nextZoom = clampImageZoom(
@@ -761,13 +792,16 @@ export function MobileGallery({
       touchRef.current = null;
       if (isClosingRef.current || isOpeningRef.current) return;
 
-      if (state.axis === 'pan') {
-        return;
-      }
-
       const duration = Date.now() - state.startTime;
       const moved =
         Math.abs(state.offsetX) > TAP_MOVE_LIMIT || Math.abs(state.offsetY) > TAP_MOVE_LIMIT;
+
+      if (state.axis === 'pan') {
+        if (!moved && duration < 320) {
+          setControlsVisible((value) => !value);
+        }
+        return;
+      }
 
       setIsDragging(false);
       setIsSheetDragging(false);
@@ -843,6 +877,75 @@ export function MobileGallery({
     };
   }, [open, completeHorizontalSwipe, onClose, runFlyoutClose, resetImageZoom, clampActiveImageZoom, prefetchNearbyDetails]);
 
+  useEffect(() => {
+    const sheet = detailsSheetRef.current;
+    if (!sheet || !open || !detailsOpen) return undefined;
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (isClosingRef.current || isOpeningRef.current) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      sheetTouchRef.current = {
+        startX: touch.clientX,
+        startY: touch.clientY,
+        offsetY: 0,
+        dragging: false,
+      };
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      const state = sheetTouchRef.current;
+      const touch = event.touches[0];
+      if (!state || !touch) return;
+
+      const offsetX = touch.clientX - state.startX;
+      const offsetY = touch.clientY - state.startY;
+      const scroller = sheet.querySelector(
+        '.image-details-panel-sheet',
+      ) as HTMLElement | null;
+      const atTop = !scroller || scroller.scrollTop <= 0;
+
+      if (!state.dragging) {
+        if (Math.abs(offsetX) < 8 && Math.abs(offsetY) < 8) return;
+        if (offsetY > 0 && Math.abs(offsetY) >= Math.abs(offsetX) && atTop) {
+          state.dragging = true;
+          setIsSheetDragging(true);
+        } else {
+          sheetTouchRef.current = null;
+          return;
+        }
+      }
+
+      event.preventDefault();
+      state.offsetY = Math.max(0, offsetY);
+      setSheetDragY(state.offsetY);
+    };
+
+    const onTouchEnd = () => {
+      const state = sheetTouchRef.current;
+      sheetTouchRef.current = null;
+      if (!state?.dragging) return;
+
+      setIsSheetDragging(false);
+      if (state.offsetY > DETAILS_OPEN_THRESHOLD) {
+        setDetailsOpen(false);
+      }
+      setSheetDragY(0);
+    };
+
+    sheet.addEventListener('touchstart', onTouchStart, { passive: true });
+    sheet.addEventListener('touchmove', onTouchMove, { passive: false });
+    sheet.addEventListener('touchend', onTouchEnd);
+    sheet.addEventListener('touchcancel', onTouchEnd);
+
+    return () => {
+      sheet.removeEventListener('touchstart', onTouchStart);
+      sheet.removeEventListener('touchmove', onTouchMove);
+      sheet.removeEventListener('touchend', onTouchEnd);
+      sheet.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [open, detailsOpen]);
+
   if (!open || !currentEntry) return null;
 
   const stageWidth = metrics.stageWidth > 0 ? metrics.stageWidth : window.innerWidth;
@@ -860,6 +963,9 @@ export function MobileGallery({
   const dragScale = Math.max(0.72, 1 - dragOffset.y / (window.innerHeight * 1.35));
   const trackTransform = `translate3d(${layout.trackX}px, 0, 0)`;
   const hasTrackTransition = !isClosing && !isOpening && !isDragging;
+  const step = trackStep(stageWidth);
+  const windowFrom = Math.max(0, index - SLIDE_WINDOW);
+  const windowTo = Math.min(mediaEntries.length - 1, index + SLIDE_WINDOW);
 
   const backdropOpacity = isClosing
     ? 0
@@ -869,13 +975,89 @@ export function MobileGallery({
   const backdropStyle: React.CSSProperties | undefined =
     isOpening && !isClosing ? undefined : { opacity: backdropOpacity };
 
+  const slideNodes = [];
+  for (let slideIndex = windowFrom; slideIndex <= windowTo; slideIndex += 1) {
+    const entry = mediaEntries[slideIndex];
+    if (!entry) continue;
+
+    const isActive = slideIndex === index;
+    const distance = Math.abs(slideIndex - index);
+    const isAdjacent = distance === 1;
+    const slideStyle: React.CSSProperties = {
+      width: layout.slideWidth,
+      left: slideIndex * step,
+    };
+
+    if (isActive) {
+      const y = dragOffset.y;
+      const scale = y > 0 ? dragScale : 1;
+      if (y > 0) {
+        slideStyle.transform = `translate3d(0, ${y}px, 0) scale(${scale})`;
+        slideStyle.zIndex = 2;
+      } else if (hasTrackTransition) {
+        slideStyle.transform = 'translate3d(0, 0, 0) scale(1)';
+      }
+      if (hasTrackTransition) {
+        slideStyle.transition = `transform ${SWIPE_ANIM_MS}ms cubic-bezier(0.33, 1, 0.68, 1)`;
+      }
+    } else if (isVerticalDismiss) {
+      slideStyle.visibility = 'hidden';
+    }
+
+    const previewSrc =
+      entry.thumbnailUrl ??
+      (entry.token
+        ? entry.type === 'video'
+          ? mediaUrl(entry.token, 'poster')
+          : mediaUrl(entry.token, 'image', 'very_low')
+        : '');
+
+    slideNodes.push(
+      <div
+        key={entry.path}
+        className="mobile-gallery-slide-item"
+        data-index={slideIndex}
+        style={slideStyle}
+      >
+        {entry.type === 'video' && entry.token ? (
+          <MobileGalleryVideoSlide
+            entry={entry}
+            isActive={isActive}
+            isNearby={isAdjacent}
+            quality={quality}
+            controlsVisible={controlsVisible}
+            previewSrc={previewSrc}
+            loadFullMedia={hydratedPaths.has(entry.path)}
+            style={
+              isActive ? { transform: imageZoomTransform(imageZoom) } : undefined
+            }
+          />
+        ) : entry.token ? (
+          <ChromeRasterImage
+            className="mobile-gallery-media"
+            src={
+              hydratedPaths.has(entry.path)
+                ? mediaUrl(entry.token, 'image', quality)
+                : previewSrc
+            }
+            alt={entry.name}
+            zoom={isActive ? imageZoom.scale : 1}
+            style={
+              isActive ? { transform: imageZoomTransform(imageZoom) } : undefined
+            }
+          />
+        ) : null}
+      </div>,
+    );
+  }
+
   const content = (
     <div
       className={`mobile-gallery${controlsVisible ? ' controls-visible' : ''}${
         isClosing ? ' closing' : ''
       }${isOpening ? ' opening' : ''}${isSheetDragging ? ' sheet-dragging' : ''}${
         detailsOpen || sheetHeight > 0 ? ' details-open' : ''
-      }`}
+      }${className ? ` ${className}` : ''}`}
       role="dialog"
       aria-modal="true"
       style={
@@ -899,7 +1081,12 @@ export function MobileGallery({
             animateClose();
           }}
         >
-          <span aria-hidden="true">←</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M14.7 5.3 8 12l6.7 6.7 1.4-1.4L10.8 12l5.3-5.3-1.4-1.4Z"
+            />
+          </svg>
         </button>
         <div className="mobile-gallery-tools">
           <GalleryQualitySelect
@@ -923,7 +1110,12 @@ export function MobileGallery({
               });
             }}
           >
-            <span aria-hidden="true">ⓘ</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 15h-2v-6h2Zm0-8h-2V7h2Z"
+              />
+            </svg>
           </button>
         </div>
       </div>
@@ -932,90 +1124,13 @@ export function MobileGallery({
         <div
           className={`mobile-gallery-track${isClosing || isOpening ? ' hidden' : ''}`}
           style={{
-            gap: layout.gap,
             transform: trackTransform,
             transition: hasTrackTransition
               ? `transform ${SWIPE_ANIM_MS}ms cubic-bezier(0.33, 1, 0.68, 1)`
               : 'none',
           }}
         >
-          {mediaEntries.map((entry, slideIndex) => {
-            const isActive = slideIndex === index;
-            const distance = Math.abs(slideIndex - index);
-            // Keep adjacent slide shells for swipe animation, but only fetch
-            // full-quality media for the active slide (neighbors reuse grid thumbs).
-            const isAdjacent = distance === 1;
-            const showMedia = isActive || isAdjacent;
-            const slideStyle: React.CSSProperties = {
-              width: layout.slideWidth,
-            };
-
-            if (isActive) {
-              const y = dragOffset.y;
-              const scale = y > 0 ? dragScale : 1;
-              if (y > 0) {
-                slideStyle.transform = `translate3d(0, ${y}px, 0) scale(${scale})`;
-                slideStyle.zIndex = 2;
-              } else if (hasTrackTransition) {
-                slideStyle.transform = 'translate3d(0, 0, 0) scale(1)';
-              }
-              if (hasTrackTransition) {
-                slideStyle.transition = `transform ${SWIPE_ANIM_MS}ms cubic-bezier(0.33, 1, 0.68, 1)`;
-              }
-            } else if (isVerticalDismiss) {
-              slideStyle.visibility = 'hidden';
-            }
-
-            const previewSrc =
-              entry.thumbnailUrl ??
-              (entry.token
-                ? entry.type === 'video'
-                  ? mediaUrl(entry.token, 'poster')
-                  : mediaUrl(entry.token, 'image', 'very_low')
-                : '');
-
-            return (
-              <div
-                key={entry.path}
-                className="mobile-gallery-slide-item"
-                data-index={slideIndex}
-                style={slideStyle}
-              >
-                {!showMedia ? null : entry.type === 'video' && entry.token ? (
-                  <MobileGalleryVideoSlide
-                    entry={entry}
-                    isActive={isActive}
-                    isNearby={isAdjacent}
-                    quality={quality}
-                    controlsVisible={controlsVisible}
-                    previewSrc={previewSrc}
-                    loadFullMedia={hydratedPaths.has(entry.path)}
-                    style={
-                      isActive
-                        ? { transform: imageZoomTransform(imageZoom) }
-                        : undefined
-                    }
-                  />
-                ) : entry.token ? (
-                  <ChromeRasterImage
-                    className="mobile-gallery-media"
-                    src={
-                      hydratedPaths.has(entry.path)
-                        ? mediaUrl(entry.token, 'image', quality)
-                        : previewSrc
-                    }
-                    alt={entry.name}
-                    zoom={isActive ? imageZoom.scale : 1}
-                    style={
-                      isActive
-                        ? { transform: imageZoomTransform(imageZoom) }
-                        : undefined
-                    }
-                  />
-                ) : null}
-              </div>
-            );
-          })}
+          {slideNodes}
         </div>
       </div>
 
@@ -1045,6 +1160,7 @@ export function MobileGallery({
       ) : null}
 
       <div
+        ref={detailsSheetRef}
         className={`mobile-gallery-details-sheet${showDetailsSheet ? ' visible' : ''}`}
         aria-hidden={!showDetailsSheet}
       >

@@ -1,3 +1,9 @@
+import {
+  getDisplayFileKind,
+  getExtension,
+  getFormatLabel,
+  type DisplayFileKind,
+} from '@smb/file-types';
 import type { CSSProperties } from 'react';
 
 export type FileIconKind =
@@ -20,97 +26,85 @@ interface FileIconStyle {
   color: string;
 }
 
-const STYLE_BY_FORMAT: Record<string, FileIconStyle> = {
-  PDF: { kind: 'pdf', label: 'PDF', color: '#e2554a' },
-
-  DOC: { kind: 'word', label: 'DOC', color: '#3b82f6' },
-  DOCX: { kind: 'word', label: 'DOCX', color: '#3b82f6' },
-  ODT: { kind: 'word', label: 'ODT', color: '#3b82f6' },
-  PAGES: { kind: 'word', label: 'PAGES', color: '#3b82f6' },
-  RTF: { kind: 'word', label: 'RTF', color: '#3b82f6' },
-
-  XLS: { kind: 'spreadsheet', label: 'XLS', color: '#22a06b' },
-  XLSX: { kind: 'spreadsheet', label: 'XLSX', color: '#22a06b' },
-  ODS: { kind: 'spreadsheet', label: 'ODS', color: '#22a06b' },
-  NUMBERS: { kind: 'spreadsheet', label: 'NUM', color: '#22a06b' },
-  CSV: { kind: 'spreadsheet', label: 'CSV', color: '#22a06b' },
-  TSV: { kind: 'spreadsheet', label: 'TSV', color: '#22a06b' },
-
-  PPT: { kind: 'presentation', label: 'PPT', color: '#e67e22' },
-  PPTX: { kind: 'presentation', label: 'PPTX', color: '#e67e22' },
-  ODP: { kind: 'presentation', label: 'ODP', color: '#e67e22' },
-  KEY: { kind: 'presentation', label: 'KEY', color: '#e67e22' },
-
-  TXT: { kind: 'text', label: 'TXT', color: '#94a3b8' },
-  MD: { kind: 'text', label: 'MD', color: '#94a3b8' },
-  MARKDOWN: { kind: 'text', label: 'MD', color: '#94a3b8' },
-  LOG: { kind: 'text', label: 'LOG', color: '#94a3b8' },
-
-  JSON: { kind: 'code', label: 'JSON', color: '#a78bfa' },
-  XML: { kind: 'code', label: 'XML', color: '#a78bfa' },
-  YAML: { kind: 'code', label: 'YAML', color: '#a78bfa' },
-  YML: { kind: 'code', label: 'YML', color: '#a78bfa' },
-  HTML: { kind: 'code', label: 'HTML', color: '#a78bfa' },
-  HTM: { kind: 'code', label: 'HTML', color: '#a78bfa' },
-  CSS: { kind: 'code', label: 'CSS', color: '#a78bfa' },
-  JS: { kind: 'code', label: 'JS', color: '#a78bfa' },
-  TS: { kind: 'code', label: 'TS', color: '#a78bfa' },
-
-  ZIP: { kind: 'archive', label: 'ZIP', color: '#c9a227' },
-  RAR: { kind: 'archive', label: 'RAR', color: '#c9a227' },
-  '7Z': { kind: 'archive', label: '7Z', color: '#c9a227' },
-  TAR: { kind: 'archive', label: 'TAR', color: '#c9a227' },
-  GZ: { kind: 'archive', label: 'GZ', color: '#c9a227' },
-  TGZ: { kind: 'archive', label: 'TGZ', color: '#c9a227' },
-  BZ2: { kind: 'archive', label: 'BZ2', color: '#c9a227' },
-  XZ: { kind: 'archive', label: 'XZ', color: '#c9a227' },
-
-  MP3: { kind: 'audio', label: 'MP3', color: '#c084fc' },
-  AAC: { kind: 'audio', label: 'AAC', color: '#c084fc' },
-  M4A: { kind: 'audio', label: 'M4A', color: '#c084fc' },
-  WAV: { kind: 'audio', label: 'WAV', color: '#c084fc' },
-  FLAC: { kind: 'audio', label: 'FLAC', color: '#c084fc' },
-  OGG: { kind: 'audio', label: 'OGG', color: '#c084fc' },
-  OPUS: { kind: 'audio', label: 'OPUS', color: '#c084fc' },
-  WMA: { kind: 'audio', label: 'WMA', color: '#c084fc' },
-  AIFF: { kind: 'audio', label: 'AIFF', color: '#c084fc' },
-
-  EPUB: { kind: 'ebook', label: 'EPUB', color: '#14b8a6' },
-
-  JPG: { kind: 'image', label: 'JPG', color: '#38bdf8' },
-  JPEG: { kind: 'image', label: 'JPG', color: '#38bdf8' },
-  PNG: { kind: 'image', label: 'PNG', color: '#38bdf8' },
-  GIF: { kind: 'image', label: 'GIF', color: '#38bdf8' },
-  WEBP: { kind: 'image', label: 'WEBP', color: '#38bdf8' },
-  BMP: { kind: 'image', label: 'BMP', color: '#38bdf8' },
-  TIF: { kind: 'image', label: 'TIF', color: '#38bdf8' },
-  TIFF: { kind: 'image', label: 'TIFF', color: '#38bdf8' },
-  HEIC: { kind: 'image', label: 'HEIC', color: '#38bdf8' },
-  HEIF: { kind: 'image', label: 'HEIF', color: '#38bdf8' },
-  AVIF: { kind: 'image', label: 'AVIF', color: '#38bdf8' },
-
-  MP4: { kind: 'video', label: 'MP4', color: '#f472b6' },
-  M4V: { kind: 'video', label: 'M4V', color: '#f472b6' },
-  MOV: { kind: 'video', label: 'MOV', color: '#f472b6' },
-  MKV: { kind: 'video', label: 'MKV', color: '#f472b6' },
-  AVI: { kind: 'video', label: 'AVI', color: '#f472b6' },
-  WEBM: { kind: 'video', label: 'WEBM', color: '#f472b6' },
-  WMV: { kind: 'video', label: 'WMV', color: '#f472b6' },
-  MPEG: { kind: 'video', label: 'MPEG', color: '#f472b6' },
-  MPG: { kind: 'video', label: 'MPG', color: '#f472b6' },
+const COLOR_BY_ICON: Record<FileIconKind, string> = {
+  pdf: '#e2554a',
+  word: '#3b82f6',
+  spreadsheet: '#22a06b',
+  presentation: '#e67e22',
+  text: '#94a3b8',
+  code: '#a78bfa',
+  archive: '#c9a227',
+  audio: '#7dd3fc',
+  ebook: '#14b8a6',
+  image: '#38bdf8',
+  video: '#f472b6',
+  generic: '#7dd3fc',
 };
 
-function styleForFormat(format?: string): FileIconStyle {
-  const key = (format ?? '').toUpperCase();
-  if (key && STYLE_BY_FORMAT[key]) return STYLE_BY_FORMAT[key];
-  if (key) {
-    return {
-      kind: 'generic',
-      label: key.length > 4 ? key.slice(0, 4) : key,
-      color: '#7dd3fc',
-    };
+/** Formats without a viewer (archives, etc.) */
+const ARCHIVE_EXTENSIONS = new Set([
+  '.zip',
+  '.rar',
+  '.7z',
+  '.tar',
+  '.gz',
+  '.tgz',
+  '.bz2',
+  '.xz',
+]);
+
+const EBOOK_EXTENSIONS = new Set(['.epub']);
+
+const PRESENTATION_EXTENSIONS = new Set(['.ppt', '.pptx', '.odp', '.key']);
+
+function iconKindForDisplay(
+  display: DisplayFileKind,
+  filename: string,
+): FileIconKind {
+  switch (display) {
+    case 'image':
+      return 'image';
+    case 'video':
+      return 'video';
+    case 'pdf':
+      return 'pdf';
+    case 'spreadsheet':
+      return 'spreadsheet';
+    case 'audio':
+      return 'audio';
+    case 'code':
+      return 'code';
+    case 'text':
+    case 'markdown':
+    case 'latex':
+      return 'text';
+    case 'office':
+      return PRESENTATION_EXTENSIONS.has(getExtension(filename))
+        ? 'presentation'
+        : 'word';
+    case 'file':
+    default: {
+      const ext = getExtension(filename);
+      if (ARCHIVE_EXTENSIONS.has(ext)) return 'archive';
+      if (EBOOK_EXTENSIONS.has(ext)) return 'ebook';
+      if (PRESENTATION_EXTENSIONS.has(ext)) return 'presentation';
+      return 'generic';
+    }
   }
-  return { kind: 'generic', label: 'FILE', color: '#7dd3fc' };
+}
+
+function styleForFile(filename: string, formatHint?: string): FileIconStyle {
+  const display = getDisplayFileKind(filename);
+  const kind = iconKindForDisplay(display, filename);
+  const label =
+    formatHint?.trim() ||
+    getFormatLabel(filename) ||
+    (kind === 'generic' ? 'FILE' : kind.toUpperCase());
+  return {
+    kind,
+    label: label.length > 4 ? label.slice(0, 4) : label,
+    color: COLOR_BY_ICON[kind],
+  };
 }
 
 function Glyph({ kind }: { kind: FileIconKind }) {
@@ -186,14 +180,68 @@ function Glyph({ kind }: { kind: FileIconKind }) {
   }
 }
 
+/** Document body top-left in the icon viewBox (matches the body path). */
+const DOC_LEFT = 6;
+const DOC_TOP = 3.5;
+/** Flat top edge ends where the fold begins. */
+const DOC_FOLD_X = 20.25;
+/** Half of `.file-type-icon-body` stroke-width; covers the rim so the badge is flush. */
+const BODY_STROKE_OUTSET = 1.35 / 2;
+/** Fixed badge box: flush top/left, extends to the fold, consistent bottom/right. */
+const BADGE_WIDTH = DOC_FOLD_X - DOC_LEFT + BODY_STROKE_OUTSET;
+const BADGE_HEIGHT = 7.13;
+const BADGE_PAD_X = 1.2;
+const BADGE_PAD_Y = 0.8;
+const BADGE_INNER_RADIUS = 0;
+/** Approximate advance width for bold condensed caps. */
+const CHAR_WIDTH_EM = 0.58;
+
+function badgeLayout(label: string) {
+  const len = Math.max(label.length, 1);
+  const x = DOC_LEFT - BODY_STROKE_OUTSET;
+  const y = DOC_TOP - BODY_STROKE_OUTSET;
+
+  const innerW = BADGE_WIDTH - BADGE_PAD_X * 2;
+  const innerH = BADGE_HEIGHT - BADGE_PAD_Y * 2 - BODY_STROKE_OUTSET;
+  // Fit height first, then shrink so the natural glyph width stays inside the pad.
+  const fontSize = Math.min(innerH, innerW / (len * CHAR_WIDTH_EM));
+
+  return {
+    x,
+    y,
+    width: BADGE_WIDTH,
+    height: BADGE_HEIGHT,
+    fontSize,
+    textX: x + BADGE_WIDTH / 2,
+    // Optical center within the visible badge (below the stroke-cover strip).
+    textY: y + BODY_STROKE_OUTSET + (BADGE_HEIGHT - BODY_STROKE_OUTSET) * 0.35,
+  };
+}
+
+/** Square on the document edges; rounded only on the inner bottom-right. */
+function badgePath(x: number, y: number, w: number, h: number, r: number): string {
+  const radius = Math.min(r, w / 2, h / 2);
+  return [
+    `M${x} ${y}`,
+    `h${w}`,
+    `v${h - radius}`,
+    `a${radius} ${radius} 0 0 1 ${-radius} ${radius}`,
+    `H${x}`,
+    'z',
+  ].join('');
+}
+
 interface FileTypeIconProps {
+  /** Path or filename for classification */
+  filename?: string;
+  /** Format label override from browse API */
   format?: string;
   className?: string;
 }
 
-export function FileTypeIcon({ format, className }: FileTypeIconProps) {
-  const style = styleForFormat(format);
-  const labelSize = style.label.length > 3 ? 6.2 : 7.2;
+export function FileTypeIcon({ filename, format, className }: FileTypeIconProps) {
+  const style = styleForFile(filename || format || '', format);
+  const badge = badgeLayout(style.label);
 
   return (
     <div
@@ -210,20 +258,17 @@ export function FileTypeIcon({ format, className }: FileTypeIconProps) {
         />
         <path className="file-type-icon-fold" d="M19.2 2.5V8a1.3 1.3 0 0 0 1.3 1.3H26" />
         <Glyph kind={style.kind} />
-        <rect
+        <path
           className="file-type-icon-badge"
-          x="5"
-          y="4.2"
-          width="14.5"
-          height="7.2"
-          rx="1.4"
+          d={badgePath(badge.x, badge.y, badge.width, badge.height, BADGE_INNER_RADIUS)}
         />
         <text
           className="file-type-icon-label"
-          x="12.25"
-          y="9.35"
+          x={badge.textX}
+          y={badge.textY}
           textAnchor="middle"
-          fontSize={labelSize}
+          dominantBaseline="central"
+          fontSize={badge.fontSize}
           fontWeight="700"
           fontFamily="ui-sans-serif, system-ui, sans-serif"
         >

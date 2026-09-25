@@ -10,6 +10,10 @@ export type MediaType = 'image' | 'video';
 
 export type EntryType = 'folder' | MediaType | 'file';
 
+/** Viewer kinds from backend fileTypes */
+export type { ViewerKind } from '@smb/file-types';
+import type { ViewerKind } from '@smb/file-types';
+
 export interface QualityProfile {
   id: QualityTier;
   label: string;
@@ -24,6 +28,10 @@ export interface BrowseEntry {
   size?: number;
   mtime?: string;
   captureTime?: string;
+  /** False until the index has a fresh row for this file */
+  indexed?: boolean;
+  /** Overlay viewer for this non-media file */
+  viewer?: ViewerKind;
   format?: string;
   duration?: number;
   token?: string;

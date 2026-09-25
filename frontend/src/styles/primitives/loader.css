@@ -1,0 +1,156 @@
+.ui-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: 100%;
+  min-height: 10rem;
+  padding: 1.5rem 1.25rem;
+  box-sizing: border-box;
+  text-align: center;
+  color: var(--color-text-soft);
+}
+
+.ui-loader--compact {
+  min-height: 0;
+  padding: 1rem;
+  gap: 0.65rem;
+}
+
+.ui-loader__spinner {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  border-top-color: var(--color-accent);
+  animation: spin 0.75s linear infinite;
+}
+
+.ui-loader--compact .ui-loader__spinner {
+  width: 1.65rem;
+  height: 1.65rem;
+}
+
+.ui-loader__label {
+  margin: 0;
+  max-width: 18rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text-soft);
+}
+
+.ui-loader__bar {
+  display: grid;
+  gap: 0.7rem;
+  width: min(16rem, 72vw);
+}
+
+.ui-loader__track {
+  position: relative;
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ui-loader__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--color-accent), #6ea0ff);
+  transition: width 320ms ease;
+}
+
+.ui-loader__indeterminate {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 38%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+  animation: progress-slide 1.2s ease-in-out infinite;
+}
+
+.ui-loader__pct {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.file-viewer-body > .ui-loader,
+.pdf-viewer-body > .ui-loader,
+.spreadsheet-viewer-body > .ui-loader {
+  min-height: 100%;
+}
+
+.gallery-media-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem;
+  border-radius: 0;
+  background: rgba(6, 10, 16, 0.18);
+  pointer-events: none;
+}
+
+.gallery-media-loader .ui-loader {
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+.gallery-media-loader .ui-loader__label,
+.gallery-media-loader .ui-loader__pct {
+  color: #f3f6fb;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+
+.gallery-thumb-overlay-host {
+  /* Fill the slide/frame so the poster matches video object-fit:contain sizing
+     (posters are ~320px and must upscale; max-only sizing left them tiny). */
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  line-height: 0;
+  z-index: 1;
+}
+
+.gallery-thumb-overlay-host.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.gallery-thumb-overlay-host__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  object-position: center center;
+}
+
+.gallery-video-prepare-slide {
+  position: relative;
+  container-type: size;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}

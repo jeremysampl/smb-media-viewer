@@ -8,6 +8,9 @@ export type FileTypeFilter =
   | 'videos'
   | 'pdf'
   | 'text'
+  | 'code'
+  | 'markdown'
+  | 'latex'
   | 'document'
   | 'spreadsheet'
   | 'presentation'
@@ -27,7 +30,7 @@ interface FilterGroup {
   options: FilterOption[];
 }
 
-/** Canonical format token → accepted BrowseEntry.format values (uppercase). */
+/** Format alias -> BrowseEntry.format values (uppercase). */
 const FORMAT_ALIASES: Record<string, string[]> = {
   jpeg: ['JPG', 'JPEG'],
   png: ['PNG'],
@@ -69,24 +72,145 @@ const VIDEO_SUBTYPES: FilterOption[] = [
   { id: 'video:mpeg', label: 'MPEG' },
 ];
 
-const TEXT_FORMATS = new Set([
-  'TXT',
-  'MD',
-  'MARKDOWN',
-  'CSV',
-  'TSV',
-  'LOG',
+const TEXT_FORMATS = new Set(['TXT', 'TEXT', 'LOG', 'RTF']);
+
+const CODE_FORMATS = new Set([
   'JSON',
+  'JSONC',
+  'JSON5',
   'XML',
+  'XSL',
+  'XSLT',
   'YAML',
   'YML',
   'HTML',
   'HTM',
   'CSS',
+  'SCSS',
+  'SASS',
+  'LESS',
   'JS',
+  'MJS',
+  'CJS',
   'TS',
-  'RTF',
+  'MTS',
+  'CTS',
+  'TSX',
+  'JSX',
+  'PY',
+  'PYW',
+  'RB',
+  'GO',
+  'RS',
+  'JAVA',
+  'C',
+  'H',
+  'CPP',
+  'CC',
+  'CXX',
+  'HPP',
+  'HH',
+  'CS',
+  'SH',
+  'BASH',
+  'ZSH',
+  'FISH',
+  'PS1',
+  'PSM1',
+  'ENV',
+  'INI',
+  'CFG',
+  'CONF',
+  'PROPERTIES',
+  'TOML',
+  'SQL',
+  'SVG',
+  'PHP',
+  'PHTML',
+  'KT',
+  'KTS',
+  'SWIFT',
+  'SCALA',
+  'SC',
+  'LUA',
+  'R',
+  'PL',
+  'PM',
+  'DART',
+  'ZIG',
+  'HS',
+  'EX',
+  'EXS',
+  'ERL',
+  'HRL',
+  'CLJ',
+  'CLJS',
+  'EDN',
+  'GRAPHQL',
+  'GQL',
+  'VUE',
+  'SVELTE',
+  'ASTRO',
+  'MDX',
+  'CMAKE',
+  'DIFF',
+  'PATCH',
+  'M',
+  'MM',
+  'F90',
+  'F95',
+  'F03',
+  'F',
+  'FOR',
+  'JL',
+  'NIM',
+  'ML',
+  'MLI',
+  'FS',
+  'FSX',
+  'FSI',
+  'VB',
+  'WAT',
+  'PROTO',
+  'PRISMA',
+  'TF',
+  'TFVARS',
+  'HCL',
+  'BICEP',
+  'SOL',
+  'VY',
+  'GLSL',
+  'FRAG',
+  'VERT',
+  'HLSL',
+  'WGSL',
+  'ASM',
+  'S',
+  'BAT',
+  'CMD',
+  'COFFEE',
+  'LISP',
+  'CL',
+  'SCM',
+  'RKT',
+  'GROOVY',
+  'GRADLE',
+  'JINJA',
+  'J2',
+  'BIB',
+  'NGINX',
+  'MK',
+  'DOCKERFILE',
+  'MAKEFILE',
+  'CMAKE',
+  'GITIGNORE',
+  'DOCKERIGNORE',
+  'EDITORCONFIG',
 ]);
+
+const MARKDOWN_FORMATS = new Set(['MD', 'MARKDOWN', 'MDOWN', 'MKD']);
+
+const LATEX_FORMATS = new Set(['TEX', 'LATEX', 'LTX']);
 
 const DOCUMENT_FORMATS = new Set([
   'DOC',
@@ -101,6 +225,10 @@ const SPREADSHEET_FORMATS = new Set([
   'XLSX',
   'ODS',
   'NUMBERS',
+  'CSV',
+  'TSV',
+  'XLSM',
+  'XLSB',
 ]);
 
 const PRESENTATION_FORMATS = new Set([
@@ -128,9 +256,12 @@ const AUDIO_FORMATS = new Set([
   'WAV',
   'FLAC',
   'OGG',
+  'OGA',
   'OPUS',
   'WMA',
   'AIFF',
+  'AIF',
+  'WEBA',
 ]);
 
 const KNOWN_IMAGE_FORMATS = new Set(
@@ -152,6 +283,9 @@ const KNOWN_OTHER_EXCLUDED = new Set([
   ...KNOWN_VIDEO_FORMATS,
   'PDF',
   ...TEXT_FORMATS,
+  ...CODE_FORMATS,
+  ...MARKDOWN_FORMATS,
+  ...LATEX_FORMATS,
   ...DOCUMENT_FORMATS,
   ...SPREADSHEET_FORMATS,
   ...PRESENTATION_FORMATS,
@@ -178,6 +312,9 @@ export const FILE_TYPE_FILTER_GROUPS: FilterGroup[] = [
     options: [
       { id: 'pdf', label: 'PDF' },
       { id: 'text', label: 'Text' },
+      { id: 'code', label: 'Source code' },
+      { id: 'markdown', label: 'Markdown' },
+      { id: 'latex', label: 'LaTeX' },
       { id: 'document', label: 'Word / Docs' },
       { id: 'spreadsheet', label: 'Spreadsheets' },
       { id: 'presentation', label: 'Presentations' },
@@ -222,7 +359,7 @@ export function entryMatchesFileTypeFilter(
   filter: FileTypeFilter,
 ): boolean {
   if (filter === 'any') return true;
-  // Always keep folders so navigation still works while filtering.
+  // Keep folders so you can still navigate while filtering.
   if (entry.type === 'folder') return true;
 
   const format = entryFormat(entry);
@@ -238,6 +375,12 @@ export function entryMatchesFileTypeFilter(
       return entry.type === 'file' && format === 'PDF';
     case 'text':
       return entry.type === 'file' && TEXT_FORMATS.has(format);
+    case 'code':
+      return entry.type === 'file' && CODE_FORMATS.has(format);
+    case 'markdown':
+      return entry.type === 'file' && MARKDOWN_FORMATS.has(format);
+    case 'latex':
+      return entry.type === 'file' && LATEX_FORMATS.has(format);
     case 'document':
       return entry.type === 'file' && DOCUMENT_FORMATS.has(format);
     case 'spreadsheet':

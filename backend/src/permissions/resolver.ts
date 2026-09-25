@@ -185,9 +185,9 @@ async function parseSmbConfFile(
   shares.push(...parseSmbSections(withoutIncludes.join('\n')));
 }
 
-/** Prefer Samba's effective config (includes expanded) when testparm is available. */
+/** Use testparm's effective config when available (includes expanded). */
 async function loadSharesFromTestparm(): Promise<ShareInfo[] | null> {
-  // `-s` prints the full effective smb.conf without interactive pause.
+  // -s prints the full effective smb.conf without pausing.
   const full = await runCommand('testparm', ['-s', config.smbConfPath]);
   if (full.code !== 0 || !full.stdout.trim()) {
     const fallback = await runCommand('testparm', ['-s']);
@@ -249,7 +249,7 @@ export async function loadShares(force = false): Promise<ShareInfo[]> {
 }
 
 let cachedGroups: Map<string, string[]> | null = null;
-/** username(lower) → group names(lower) */
+/** username (lower) -> group names (lower) */
 const membershipCache = new Map<string, string[]>();
 
 async function loadGroups(): Promise<Map<string, string[]>> {

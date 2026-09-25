@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { mediaUrl } from '../api/client';
 import type { BrowseEntry, QualityTier } from '../types';
+import { GalleryThumbWithLoader } from './GalleryVideoLoader';
+import { useVideoPrepareStatus } from './useVideoPrepareStatus';
 
 interface MobileGalleryVideoSlideProps {
   entry: BrowseEntry;
@@ -8,9 +10,9 @@ interface MobileGalleryVideoSlideProps {
   isNearby: boolean;
   quality: QualityTier;
   controlsVisible: boolean;
-  /** Already-cached grid thumb/poster for adjacent slides (no full video fetch). */
+  /** Grid thumb/poster for adjacent slides (no full video fetch). */
   previewSrc?: string;
-  /** True once this slide has been opened — keeps full media while swiping away. */
+  /** True after open so full media stays loaded while swiping away. */
   loadFullMedia?: boolean;
   style?: CSSProperties;
 }
@@ -29,11 +31,14 @@ export function MobileGalleryVideoSlide({
   const [mediaReady, setMediaReady] = useState(false);
   const posterUrl =
     previewSrc || (entry.token ? mediaUrl(entry.token, 'poster') : '');
-  const shouldLoadVideo = loadFullMedia;
+  const shouldPrepare = Boolean(entry.token && (loadFullMedia || isActive));
+  const prepare = useVideoPrepareStatus(entry.token, quality, shouldPrepare);
+  const shouldLoadVideo = shouldPrepare && prepare.ready;
+  const showPrepareLoader = prepare.known && prepare.processing;
 
   useEffect(() => {
     setMediaReady(false);
-  }, [entry.path]);
+  }, [entry.path, quality]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -41,18 +46,28 @@ export function MobileGalleryVideoSlide({
     if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
       setMediaReady(true);
     }
-  }, [shouldLoadVideo, entry.path, isActive]);
+  }, [shouldLoadVideo, entry.path, isActive, quality]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return undefined;
 
     if (isActive && mediaReady) {
-      void video.play().catch(() => undefined);
+      const play = async () => {
+        try {
+          video.muted = true;
+          await video.play();
+          if (isActive) video.muted = false;
+        } catch {
+          // Controls stay available for a manual tap
+        }
+      };
+      void play();
     } else {
       video.pause();
       if (!isActive) {
         video.currentTime = 0;
+        video.muted = true;
       }
     }
 
@@ -61,31 +76,36 @@ export function MobileGalleryVideoSlide({
 
   if (!entry.token) return null;
 
-  const showPoster = !isActive || !mediaReady;
+  const showPoster = !isActive || !mediaReady || showPrepareLoader;
   const posterSrc = isActive || isNearby || loadFullMedia ? posterUrl : '';
+  const videoSrc = mediaUrl(entry.token, 'video', quality);
 
   return (
     <div className="mobile-gallery-video-frame" style={style}>
       {posterSrc ? (
-        <img
-          className={`mobile-gallery-video-poster${showPoster ? '' : ' hidden'}`}
+        <GalleryThumbWithLoader
           src={posterSrc}
           alt={entry.name}
-          draggable={false}
+          hidden={!showPoster}
+          showLoader={showPrepareLoader}
+          progress={prepare.progress}
         />
       ) : null}
       {shouldLoadVideo ? (
         <video
+          key={`${entry.path}:${quality}:${videoSrc}`}
           ref={videoRef}
           className={`mobile-gallery-video-player${isActive && mediaReady ? ' ready' : ''}`}
-          src={mediaUrl(entry.token, 'video', quality)}
           controls={controlsVisible && isActive && mediaReady}
           playsInline
-          muted={!isActive}
+          muted
           preload="auto"
           onLoadedData={() => setMediaReady(true)}
           onCanPlay={() => setMediaReady(true)}
-        />
+          onError={() => setMediaReady(false)}
+        >
+          <source src={videoSrc} type="video/mp4" />
+        </video>
       ) : null}
     </div>
   );

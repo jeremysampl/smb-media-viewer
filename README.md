@@ -1,11 +1,78 @@
 # SMB Media Viewer
 
-Self-hosted media gallery for OpenMediaVault NAS shares. Users sign in with their existing Samba credentials, browse only the folders they can access, and view images/videos in a swipeable gallery with selectable quality tiers.
+Self-hosted gallery and file browser for Samba shares. Sign in with your existing Samba credentials, browse the folders you can access, and open photos, videos, documents, audio, and source files in the browser. You can also cast a slideshow to a Chromecast or Google TV. Works with any Samba host (OpenMediaVault is a common example).
+
+<p align="center">
+  <img src="docs/images/desktop-gallery.png" alt="Desktop media library" />
+  <img src="docs/images/mobile-gallery.jpg" alt="Mobile media library" />
+</p>
+
+## Features
+
+- **Samba login**: uses your existing users and share ACLs (no separate accounts)
+- **Media gallery**: grid browse with sort, type filters, quality tiers, and a swipeable lightbox (desktop and mobile)
+- **Documents and code**: preview PDFs, Office files, Markdown, LaTeX, text, and syntax-highlighted source
+- **Audio**: built-in player for MP3 and other common formats
+- **Google Cast**: slideshows from photos, videos, or whole folders (reorder, shuffle, repeat)
+- **Admin dashboard**: jobs, host metrics, cache, and media index management
+- **Docker**: pre-built multi-arch images for amd64 and arm64 (including Raspberry Pi)
+
+## Screenshots
+
+### Media library
+
+Mixed folders get type-colored icons for documents, code, audio, and more. Sort, filter by type, pick a quality tier, and toggle file details.
+
+<img src="docs/images/documents-folder.png" alt="Documents folder with mixed file type icons" width="800" />
+
+### Photo and video viewer
+
+Swipe through images and videos in the lightbox. Quality tier and file info are in the toolbar.
+
+| Image | Video |
+|-------|-------|
+| <img src="docs/images/desktop-image-view.png" alt="Desktop image lightbox" width="400" /> | <img src="docs/images/desktop-video-view.png" alt="Desktop video player" width="400" /> |
+
+Mobile:
+
+| Image | Video |
+|-------|-------|
+| <img src="docs/images/mobile-image-view.jpg" alt="Desktop image lightbox" width="400" /> | <img src="docs/images/mobile-video-view.jpg" alt="Desktop video player" width="400" /> |
+
+### Built-in viewer examples
+
+| PDF | Audio |
+|-----|-------|
+| <img src="docs/images/pdf-viewer.png" alt="In-browser PDF viewer" width="400" /> | <img src="docs/images/mp3-player.png" alt="MP3 audio player" width="400" /> |
+
+| Source code | Spreadsheet |
+|-------------|-------|
+| <img src="docs/images/python-viewer.png" alt="Syntax-highlighted Python viewer" width="400" /> | <img src="docs/images/spreadsheet-viewer.png" alt="LaTeX source viewer" width="400" /> |
+
+### Google Cast
+
+Select media or folders, set interval / shuffle / repeat, then cast to a TV. Keep the sender tab open while the slideshow runs.
+
+| Cast setup |
+|------------|
+| <img src="docs/images/cast-modal.png" alt="Cast media dialog with queue and settings" width="800" /> |
+
+| Now playing |
+|-------------|
+| <img src="docs/images/cast-controls.png" alt="Cast media dialog with queue and settings" width="800" /> |
+
+### Admin dashboard
+
+Inspect the transcode cache and permanent media index. Search, filter by folder, and clear selected rows or everything.
+
+| Cache | Index |
+|-------|-------|
+| <img src="docs/images/admin-cache.png" alt="Admin cache management table" width="400" /> | <img src="docs/images/admin-index.png" alt="Admin media index table" width="400" /> |
 
 ## Architecture
 
 - **Frontend**: React + Vite SPA served by Nginx
-- **Backend**: Node.js + Express API with Sharp (images) and ffmpeg (video transcodes)
+- **Backend**: Node.js + Express API with Sharp (images), ffmpeg (video transcodes), and LibreOffice (Office document previews)
 - **Auth**: Validates credentials against the host Samba service via `smbclient`
 - **Permissions**: Parsed from `/etc/samba/smb.conf` plus `/etc/group`
 - **Containers**: Separate Docker images for frontend and backend
@@ -19,7 +86,7 @@ Self-hosted media gallery for OpenMediaVault NAS shares. Users sign in with thei
 | Medium | 1280px WebP | 720p |
 | High | 1920px WebP | 1080p |
 | Very High | 2560px WebP | 1440p |
-| Full | Original file when browser-native (JPEG/PNG/GIF/WebP/AVIF/BMP); otherwise WebP convert (HEIC/TIFF/…) | Remux/transcode |
+| Full | Original file when browser-native (JPEG/PNG/GIF/WebP/AVIF/BMP); otherwise WebP convert (HEIC/TIFF/…) | Original when already playable (H.264/HEVC/VP9/AV1 + common audio in MP4/WebM); otherwise remux to MP4 |
 
 Transcodes for the lightbox are cached on disk under `CACHE_DIR` and may be evicted when the cache exceeds `CACHE_MAX_BYTES`.
 
@@ -31,18 +98,41 @@ The index is not size-capped. Folder browse returns as soon as directory listing
 
 Configure both locations via env (`CACHE_DIR`, `INDEX_DIR`). In Docker Compose these map to `smb_media_cache` and `smb_media_index` volumes.
 
-## Prerequisites (OMV host)
+## Google Cast slideshows
+
+Select photos, videos, or folders and choose **Cast** to build a slideshow queue. Selected folders include nested media. The queue can be reordered, shuffled, repeated, changed while playing, or switched to **Pick photos** mode for manual control. Videos play through, then the slideshow advances.
+
+Casting requires Chrome, Edge, or Android Chrome. Google only enables the Cast sender API on secure pages (`https://` or `localhost`). Plain `http://192.168.x.x` pages usually show Cast as unavailable.
+
+Recommended LAN setup:
+
+1. Run the frontend with host binding (`npm run dev -- --host`).
+2. Open the app on `http://localhost:5173` (or whatever port Vite prints) so Cast controls work.
+3. In the Cast dialog, set **LAN media address** to your machine's LAN URL, e.g. `http://192.168.1.50:5173`. Chromecast loads media from that address.
+4. Optional: set `CAST_PUBLIC_ORIGIN=http://192.168.1.50:5173` in the backend env so the dialog can default it.
+
+Alternative: open the LAN HTTP URL directly and tell Chrome to treat it as secure:
+
+```text
+chrome://flags/#unsafely-treat-insecure-origin-as-secure
+```
+
+Add `http://192.168.1.50:5173`, enable the flag, relaunch Chrome.
+
+Keep the sender tab open while a slideshow is playing because the browser controls the timer. The app uses Google's Default Media Receiver. Photos are signed JPEG URLs; videos stream as-is when already playable (H.264/HEVC/VP9/AV1 + common audio in MP4/WebM), otherwise remux to MP4 on first play if needed. Custom fade/slide transitions need a custom receiver. iOS Cast is not supported.
+
+## Prerequisites
 
 - Docker and Docker Compose
-- Samba shares already configured in OMV
-- RAID/share paths available on the host (typically under `/srv/...`)
-- Ports available (default frontend `8080`, backend `3001` on host network)
+- Samba shares already set up on the host (e.g. OpenMediaVault)
+- Share paths available on the host (often under `/srv/...`)
+- Ports free (default frontend `8080`, backend `3001` on host network)
 
-## Quick start on OMV (pull images)
+## Quick start (pull images)
 
 No need to build from source. Pre-built images are published to GitHub Container Registry (GHCR) from this repo.
 
-1. Create a folder on the NAS and download Compose + env example:
+1. Create a folder on the host and download Compose + env example:
 
 ```bash
 mkdir -p smb-media-viewer && cd smb-media-viewer
@@ -96,7 +186,7 @@ Sign in with a Samba user that already has access to one or more shares.
 
 ### Build from source instead
 
-If you prefer to compile on the NAS (or GHCR packages are unavailable):
+If you prefer to build on the host (or GHCR packages are unavailable):
 
 ```bash
 git clone https://github.com/jeremysampl/smb-media-viewer.git
@@ -113,7 +203,7 @@ Pushes to `main` and version tags (`v1.2.3`) run [.github/workflows/publish-imag
 - `ghcr.io/jeremysampl/smb-media-viewer-backend`
 - `ghcr.io/jeremysampl/smb-media-viewer-frontend`
 
-Docker pulls the matching architecture automatically for your NAS.
+Docker pulls the matching architecture automatically.
 
 After the **first** successful workflow run, make the packages public (otherwise anonymous `docker pull` fails):
 
@@ -130,6 +220,7 @@ No extra secrets are required for GHCR from Actions in this repo (`GITHUB_TOKEN`
 The production setup expects Samba (`smbclient`) and `/etc/samba/smb.conf` on the NAS. For local UI and media-pipeline testing, use **local dev mode**:
 
 1. Install [ffmpeg](https://ffmpeg.org/) on your machine (required for video thumbnails/transcodes).
+   For Word/PowerPoint previews, install LibreOffice (`soffice` on PATH).
 
 2. Copy the local env file and add test media:
 
@@ -180,7 +271,7 @@ npm install
 npm run dev
 ```
 
-Requires `ffmpeg` and `smbclient` on the host for local auth tests.
+Requires `ffmpeg` and `smbclient` on the host for local auth tests. Office previews also need LibreOffice (`soffice`).
 
 ### Frontend
 
@@ -195,18 +286,24 @@ Vite proxies `/api` to `http://localhost:3001`.
 ## API overview
 
 - `POST /api/auth/login` - Samba credential check, sets httpOnly session cookie
-- `GET /api/auth/me` - Current user
+- `GET /api/auth/me` - Current user (`username`, `admin`)
+- `GET /api/admin/status` - Admin-only live jobs + host/process metrics
 - `GET /api/shares` - Top-level accessible shares
 - `GET /api/browse?path=ShareName/folder` - Folder listing
 - `GET /api/media/:token/image?quality=medium` - Resized image
 - `GET /api/media/:token/video?quality=medium` - Transcoded/streamed video (Range supported)
 - `GET /api/media/:token/poster` - Video thumbnail
+- `GET /api/media/:token/raw` - Text, PDF, or spreadsheet bytes for in-browser viewers
+- `GET /api/media/:token/pdf-preview` - Office document converted to PDF (cached; requires LibreOffice)
 
 Media tokens are signed and scoped to the authenticated user.
+
+Set `ADMIN_USERS=alice,bob` (Samba usernames, comma-separated) to enable `/admin`. Those users see an **Admin** item in the account menu with Overview, Jobs, Cache, and Index panels (paginated, sortable/filterable tables, including folder filters). Cache and Index support clearing selected rows, everything under a folder filter, or the entire store. Cache open counts and last-opened times are tracked whenever a cached image/video is served.
 
 ## Security notes
 
 - Change default secrets before production use.
+- Restrict `/admin` with `ADMIN_USERS` (Samba usernames). Leave unset to disable the dashboard.
 - Backend uses `network_mode: host` so it can reach the native Samba daemon on port 445.
 - Share access is enforced using Samba ACLs from `smb.conf` (share-level in v1).
 - Paths outside allowed shares return 404 to avoid leaking filesystem layout.
@@ -221,10 +318,10 @@ Media tokens are signed and scoped to the authenticated user.
   1. On the NAS, run `testparm -s` and confirm share sections + `path =` lines.
   2. Confirm compose mounts the **whole** `/etc/samba` directory (not only `smb.conf`) and `/etc/passwd` + `/etc/group`.
   3. Confirm each share `path` exists in the container (usually via `/srv:/srv:ro`). Example check: `docker exec smb-media-viewer-backend ls /srv`
-  4. Check backend logs: `docker logs smb-media-viewer-backend 2>&1 | grep shares` — you should see `Loaded N share(s)`. If N>0 but the UI is empty, the user failed the `valid users` / group ACL filter (primary group `@users` is now supported).
+  4. Check backend logs: `docker logs smb-media-viewer-backend 2>&1 | grep shares`: you should see `Loaded N share(s)`. If N>0 but the UI is empty, the user failed the `valid users` / group ACL filter (primary group `@users` is now supported).
 - **Shares appear but folders look empty / Path not found**: the `path =` in Samba does not match a mounted host directory inside the container. Align volume mounts with `testparm -s` paths.
 - **Login fails for valid users**: confirm `smbclient` works on the host and `SMB_HOST` is reachable from the backend container (`127.0.0.1` with host networking).
-- **Videos won't play**: first view triggers ffmpeg transcode; wait for cache generation or try a lower quality tier.
+- **Videos won't play**: Full quality streams originals when already H.264+AAC MP4/MOV; otherwise the first view remuxes/transcodes. Wait for cache generation or try a lower quality tier.
 - **High CPU usage**: lower default quality tier and reduce concurrent viewers; cache warms up over time.
 - **Date sort looks wrong on first open**: while indexing is active the grid keeps mtime order so thumbs don’t reshuffle; after indexing finishes it switches to capture time (data lives under `INDEX_DIR`).
 - **Slow first thumbnail row**: grid thumbs are generated into `INDEX_DIR` on demand / while indexing (capped by `INDEX_CONCURRENCY`); they are permanent afterward.

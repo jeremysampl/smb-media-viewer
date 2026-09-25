@@ -10,6 +10,10 @@ export type MediaType = 'image' | 'video';
 
 export type EntryType = 'folder' | MediaType | 'file';
 
+/** Non-media overlay viewers */
+export type { ViewerKind } from './media/fileTypes.js';
+import type { ViewerKind } from './media/fileTypes.js';
+
 export interface ShareInfo {
   name: string;
   path: string;
@@ -27,6 +31,10 @@ export interface BrowseEntry {
   size?: number;
   mtime?: string;
   captureTime?: string;
+  /** False until the index has a fresh row for this file */
+  indexed?: boolean;
+  /** Overlay viewer for this non-media file */
+  viewer?: ViewerKind;
   format?: string;
   duration?: number;
   token?: string;
@@ -41,4 +49,10 @@ export interface MediaTokenPayload {
   path: string;
   username: string;
   exp: number;
+}
+
+export interface CastTokenPayload extends MediaTokenPayload {
+  purpose: 'cast';
+  /** Active cast session id used for admin stop / revoke. */
+  sid?: string;
 }

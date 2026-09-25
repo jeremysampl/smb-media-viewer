@@ -22,26 +22,20 @@ interface ChromeRasterImageProps extends ImgProps {
   src: string;
   alt: string;
   className?: string;
-  /** Applied to the outer shell (e.g. mobile pinch-zoom transform). */
+  /** Outer shell style (mobile pinch-zoom transform, etc.). */
   style?: CSSProperties;
-  /** Explicit container size (YARL slide rect). If omitted, measures the shell. */
+  /** YARL slide size. Measures the shell if omitted. */
   containerWidth?: number;
   containerHeight?: number;
-  /** Current CSS zoom (1 = fit). Mobile only applies will-change pre-scale while zoomed. */
+  /** CSS zoom (1 = fit). Mobile pre-scales only while zoomed. */
   zoom?: number;
-  /**
-   * mobile: fill parent; keep geometry stable across zoom; GPU pre-scale only while zoomed.
-   * desktop: shell sized to contain-fit box for YARL centering/zoom; pre-scale at rest.
-   */
+  /** mobile = fill parent; desktop = contain-fit shell for YARL zoom. */
   variant?: ChromeRasterVariant;
-  /** Notify parent of intrinsic size (YARL zoom needs slide width/height). */
+  /** Report natural size for YARL zoom. */
   onNaturalSize?: (width: number, height: number) => void;
 }
 
-/**
- * Cross-fade quality/src changes: keep the current bitmap + layout until the next
- * URL has decoded, so zoomed views don't flash/stretch while the new tier loads.
- */
+/** Keep the current frame until the new src decodes so quality switches don't flash. */
 export function ChromeRasterImage({
   src,
   alt,
@@ -89,7 +83,7 @@ export function ChromeRasterImage({
       const height = image.naturalHeight;
       if (width > 0 && height > 0) {
         setNatural((previous) => {
-          // Same photo / aspect: keep layout numbers stable across quality tiers.
+          // Same aspect: keep layout stable across quality tiers.
           if (
             previous.width > 0 &&
             previous.height > 0 &&

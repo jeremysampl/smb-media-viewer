@@ -1,9 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import exifr from 'exifr';
 import sharp from 'sharp';
 import { isImageFile, isVideoFile } from './fileTypes.js';
 import { pickCaptureTime } from './captureTime.js';
+import { parseExifFile } from './exif.js';
 import { getVideoMetadata, type VideoMetadata } from './videoMetadata.js';
 
 export interface ImageMetadata {
@@ -75,14 +75,12 @@ export async function getImageMetadata(sourcePath: string): Promise<ImageMetadat
     // ignore unsupported formats for sharp
   }
 
-  const exif = (await exifr
-    .parse(sourcePath, {
-      gps: true,
-      tiff: true,
-      exif: true,
-      mergeOutput: true,
-    })
-    .catch(() => null)) as Record<string, unknown> | null;
+  const exif = await parseExifFile(sourcePath, {
+    gps: true,
+    tiff: true,
+    exif: true,
+    mergeOutput: true,
+  });
 
   const metadata: ImageMetadata = {
     kind: 'image',

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SelectField, type SelectFieldLayout } from '../ui';
 import { SORT_OPTIONS, type SortMethod } from './sortEntries';
 
 const STORAGE_KEY = 'smb-media-sort';
@@ -24,31 +25,28 @@ interface SortSelectorProps {
   sort: SortMethod;
   onChange: (sort: SortMethod) => void;
   busy?: boolean;
+  layout?: SelectFieldLayout;
 }
 
-export function SortSelector({ sort, onChange, busy = false }: SortSelectorProps) {
+export function SortSelector({
+  sort,
+  onChange,
+  busy = false,
+  layout = 'inline',
+}: SortSelectorProps) {
   return (
-    <label className={`toolbar-control${busy ? ' is-busy' : ''}`}>
-      <span className="toolbar-control-label">
-        <span className={busy ? 'is-hidden' : undefined}>Sort</span>
-        <span
-          className={`toolbar-control-spinner${busy ? ' is-visible' : ''}`}
-          aria-hidden={!busy}
-        />
-      </span>
-      <select
-        className="toolbar-control-select"
-        value={sort}
-        aria-label="Sort"
-        aria-busy={busy}
-        onChange={(event) => onChange(event.target.value as SortMethod)}
-      >
-        {SORT_OPTIONS.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <SelectField
+      label="Sort"
+      value={sort}
+      busy={busy}
+      layout={layout}
+      onChange={(value) => onChange(value as SortMethod)}
+    >
+      {SORT_OPTIONS.map((option) => (
+        <option key={option.id} value={option.id}>
+          {option.label}
+        </option>
+      ))}
+    </SelectField>
   );
 }

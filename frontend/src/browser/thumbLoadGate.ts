@@ -1,8 +1,4 @@
-/**
- * Soft cap on concurrent thumb HTTP fetches.
- * Backend INDEX_CONCURRENCY still limits Sharp/ffmpeg generation.
- * Visibility (IntersectionObserver) already limits who requests.
- */
+// Soft cap on concurrent thumb fetches. Backend INDEX_CONCURRENCY still limits generation.
 const MAX_IN_FLIGHT = 16;
 
 let active = 0;
@@ -16,7 +12,7 @@ function pump(): void {
   }
 }
 
-/** Acquire a thumb-load slot; call the returned release when load finishes/cancels. */
+/** Take a slot; call the returned fn when the load finishes or cancels. */
 export function acquireThumbSlot(): Promise<() => void> {
   return new Promise((resolve) => {
     const grant = () => {
