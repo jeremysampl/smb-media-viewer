@@ -22,8 +22,11 @@ jobs:
         include:
           - context: backend
             image_name: smb-media-viewer-backend
+            build_contexts: ''
           - context: frontend
             image_name: smb-media-viewer-frontend
+            # Frontend aliases @smb/file-types -> backend/src/media/fileTypes.ts
+            build_contexts: backend=backend
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -56,6 +59,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
+          build-contexts: ${{ matrix.build_contexts }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

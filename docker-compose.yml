@@ -46,7 +46,11 @@ services:
 
   frontend:
     image: ghcr.io/jeremysampl/smb-media-viewer-frontend:${IMAGE_TAG:-latest}
-    build: ./frontend
+    build:
+      context: ./frontend
+      # Shared @smb/file-types module lives under backend/
+      additional_contexts:
+        backend: ./backend
     container_name: smb-media-viewer-frontend
     restart: unless-stopped
     ports:
