@@ -1,6 +1,73 @@
 # SMB Media Viewer
 
-Self-hosted media gallery for OpenMediaVault NAS shares. Users sign in with their existing Samba credentials, browse only the folders they can access, and view images/videos in a swipeable gallery with selectable quality tiers.
+Self-hosted gallery and file browser for Samba shares. Sign in with your existing Samba credentials, browse the folders you can access, and open photos, videos, documents, audio, and source files in the browser. You can also cast a slideshow to a Chromecast or Google TV. Works with any Samba host (OpenMediaVault is a common example).
+
+<p align="center">
+  <img src="docs/images/desktop-gallery.png" alt="Desktop media library" />
+  <img src="docs/images/mobile-gallery.jpg" alt="Mobile media library" />
+</p>
+
+## Features
+
+- **Samba login**: uses your existing users and share ACLs (no separate accounts)
+- **Media gallery**: grid browse with sort, type filters, quality tiers, and a swipeable lightbox (desktop and mobile)
+- **Documents and code**: preview PDFs, Office files, Markdown, LaTeX, text, and syntax-highlighted source
+- **Audio**: built-in player for MP3 and other common formats
+- **Google Cast**: slideshows from photos, videos, or whole folders (reorder, shuffle, repeat)
+- **Admin dashboard**: jobs, host metrics, cache, and media index management
+- **Docker**: pre-built multi-arch images for amd64 and arm64 (including Raspberry Pi)
+
+## Screenshots
+
+### Media library
+
+Mixed folders get type-colored icons for documents, code, audio, and more. Sort, filter by type, pick a quality tier, and toggle file details.
+
+<img src="docs/images/documents-folder.png" alt="Documents folder with mixed file type icons" width="800" />
+
+### Photo and video viewer
+
+Swipe through images and videos in the lightbox. Quality tier and file info are in the toolbar.
+
+| Image | Video |
+|-------|-------|
+| <img src="docs/images/desktop-image-view.png" alt="Desktop image lightbox" width="400" /> | <img src="docs/images/desktop-video-view.png" alt="Desktop video player" width="400" /> |
+
+Mobile:
+
+| Image | Video |
+|-------|-------|
+| <img src="docs/images/mobile-image-view.jpg" alt="Desktop image lightbox" width="400" /> | <img src="docs/images/mobile-video-view.jpg" alt="Desktop video player" width="400" /> |
+
+### Built-in viewer examples
+
+| PDF | Audio |
+|-----|-------|
+| <img src="docs/images/pdf-viewer.png" alt="In-browser PDF viewer" width="400" /> | <img src="docs/images/mp3-player.png" alt="MP3 audio player" width="400" /> |
+
+| Source code | Spreadsheet |
+|-------------|-------|
+| <img src="docs/images/python-viewer.png" alt="Syntax-highlighted Python viewer" width="400" /> | <img src="docs/images/spreadsheet-viewer.png" alt="LaTeX source viewer" width="400" /> |
+
+### Google Cast
+
+Select media or folders, set interval / shuffle / repeat, then cast to a TV. Keep the sender tab open while the slideshow runs.
+
+| Cast setup |
+|------------|
+| <img src="docs/images/cast-modal.png" alt="Cast media dialog with queue and settings" width="800" /> |
+
+| Now playing |
+|-------------|
+| <img src="docs/images/cast-controls.png" alt="Cast media dialog with queue and settings" width="800" /> |
+
+### Admin dashboard
+
+Inspect the transcode cache and permanent media index. Search, filter by folder, and clear selected rows or everything.
+
+| Cache | Index |
+|-------|-------|
+| <img src="docs/images/admin-cache.png" alt="Admin cache management table" width="400" /> | <img src="docs/images/admin-index.png" alt="Admin media index table" width="400" /> |
 
 ## Architecture
 
@@ -54,18 +121,18 @@ Add `http://192.168.1.50:5173`, enable the flag, relaunch Chrome.
 
 Keep the sender tab open while a slideshow is playing because the browser controls the timer. The app uses Google's Default Media Receiver. Photos are signed JPEG URLs; videos stream as-is when already playable (H.264/HEVC/VP9/AV1 + common audio in MP4/WebM), otherwise remux to MP4 on first play if needed. Custom fade/slide transitions need a custom receiver. iOS Cast is not supported.
 
-## Prerequisites (OMV host)
+## Prerequisites
 
 - Docker and Docker Compose
-- Samba shares already configured in OMV
-- RAID/share paths available on the host (typically under `/srv/...`)
-- Ports available (default frontend `8080`, backend `3001` on host network)
+- Samba shares already set up on the host (e.g. OpenMediaVault)
+- Share paths available on the host (often under `/srv/...`)
+- Ports free (default frontend `8080`, backend `3001` on host network)
 
-## Quick start on OMV (pull images)
+## Quick start (pull images)
 
 No need to build from source. Pre-built images are published to GitHub Container Registry (GHCR) from this repo.
 
-1. Create a folder on the NAS and download Compose + env example:
+1. Create a folder on the host and download Compose + env example:
 
 ```bash
 mkdir -p smb-media-viewer && cd smb-media-viewer
@@ -119,7 +186,7 @@ Sign in with a Samba user that already has access to one or more shares.
 
 ### Build from source instead
 
-If you prefer to compile on the NAS (or GHCR packages are unavailable):
+If you prefer to build on the host (or GHCR packages are unavailable):
 
 ```bash
 git clone https://github.com/jeremysampl/smb-media-viewer.git
@@ -136,7 +203,7 @@ Pushes to `main` and version tags (`v1.2.3`) run [.github/workflows/publish-imag
 - `ghcr.io/jeremysampl/smb-media-viewer-backend`
 - `ghcr.io/jeremysampl/smb-media-viewer-frontend`
 
-Docker pulls the matching architecture automatically for your NAS.
+Docker pulls the matching architecture automatically.
 
 After the **first** successful workflow run, make the packages public (otherwise anonymous `docker pull` fails):
 
